@@ -95,6 +95,6 @@ internal class AuthControllerIT {
         assertThat(loginResponse.body?.title).isEqualTo("Invalid username or password")
         assertThat(loginResponse.body?.status).isEqualTo(Status.UNAUTHORIZED)
         assertThat(loginResponse.body?.type).isEqualTo(URI.create("api/v1/problems/INVALID_CREDENTIALS"))
-        assertThat(loginResponse.body?.message).isEqualTo("")
+        assertThat(loginResponse.body?.message).isEqualTo("Invalid username or password")
     }
 }
