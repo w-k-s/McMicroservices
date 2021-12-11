@@ -1,15 +1,15 @@
 package io.wks.mcmicroservices.orderservice
 
-import io.wks.mcmicroservices.orderservice.BaseSpringBootTest.Companion.postgreSQLContainer
-import org.junit.jupiter.api.BeforeAll
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.util.TestPropertyValues
+import org.springframework.boot.test.web.client.TestRestTemplate
+import org.springframework.boot.web.server.LocalServerPort
 import org.springframework.context.ApplicationContextInitializer
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.ContextConfiguration
-import org.springframework.test.context.support.TestPropertySourceUtils
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Testcontainers
 
@@ -19,6 +19,13 @@ import org.testcontainers.junit.jupiter.Testcontainers
 @ContextConfiguration(initializers = [BaseSpringBootTest.DockerPostgreDataSourceInitializer::class])
 @Testcontainers
 class BaseSpringBootTest {
+
+    @Autowired
+    protected lateinit var restTemplate: TestRestTemplate
+
+    @LocalServerPort
+    protected var port: Int = 0
+
     companion object {
         val postgreSQLContainer = PostgreSQLContainer<Nothing>("postgres:9.4")
     }
