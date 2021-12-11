@@ -27,7 +27,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
-    //implementation("org.springframework.boot:spring-boot-starter-json") // https://docs.spring.io/spring-boot/docs/2.0.6.RELEASE/reference/html/boot-features-json.html
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
@@ -42,7 +41,6 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.testcontainers:postgresql")
-    //testImplementation("org.apache.httpcomponents:httpclient:4.5.13") // Required so that RestTemplate can handle 401 errors (https://stackoverflow.com/a/60455550/821110)
 }
 
 dependencyManagement {
