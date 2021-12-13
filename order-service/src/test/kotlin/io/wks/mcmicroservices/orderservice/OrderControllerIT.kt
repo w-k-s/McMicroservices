@@ -81,7 +81,7 @@ internal class OrderControllerIT : BaseSpringBootTest() {
                     "title":"Constraint Violation",
                     "status":400,
                     "type":"https://zalando.github.io/problem/constraint-violation",
-                    "violations":[{"field":"items","message":"Must be valid"}]
+                    "violations":[{"field":"items","message":"Topping can not be blank"}]
                 }""".trimIndent()
                 )
             }

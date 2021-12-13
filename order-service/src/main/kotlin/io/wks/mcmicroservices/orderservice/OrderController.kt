@@ -59,7 +59,7 @@ class ExceptionHandler : ProblemHandling{
         request: NativeWebRequest
     ): ResponseEntity<Problem> {
         return when(val cause = exception.mostSpecificCause){
-            is ConstraintViolationProblem -> ResponseEntity.badRequest().body(cause)
+            is ConstraintViolationProblem -> create(cause, cause, request)
             else -> super.handleMessageNotReadableException(exception, request)
         }
     }
