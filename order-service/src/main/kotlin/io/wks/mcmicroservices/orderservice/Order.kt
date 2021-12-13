@@ -2,6 +2,7 @@ package io.wks.mcmicroservices.orderservice
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonValue
+import io.konform.validation.Validation
 import org.springframework.data.annotation.CreatedDate
 import org.springframework.data.annotation.Id
 import org.springframework.data.annotation.LastModifiedDate
@@ -9,11 +10,6 @@ import org.springframework.data.annotation.Version
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.*
-import javax.validation.Constraint
-import javax.validation.ConstraintValidator
-import javax.validation.ConstraintValidatorContext
-import javax.validation.Payload
-import kotlin.reflect.KClass
 
 // TODO: Why does deserialization fail if I annotate the constructor with @JsonCreator, yet work when i create and annotate a factory method
 data class OrderId constructor(@JsonValue val value: String) {
@@ -39,6 +35,16 @@ data class Toppings constructor(
             .let { Toppings(it.toSortedSet()) }
     }
 
+    init {
+        Validation<Toppings>{
+            Toppings::items {
+                addConstraint("Topping can not be blank"){ item ->
+                    item.none { it.isBlank() }
+                }
+            }
+        }(this).raiseProblem()
+    }
+
     constructor(vararg toppings: String) : this(sortedSetOf(*toppings))
 
     override fun toString() = items.joinToString(", ")
@@ -62,20 +68,5 @@ data class Order(
         PREPARING,
         READY,
         FAILED
-    }
-}
-
-@Constraint(validatedBy = [ToppingsValidator::class])
-@Retention(AnnotationRetention.RUNTIME)
-annotation class ValidToppings(
-    val message: String = "Toppings can not be empty.",
-    val groups: Array<KClass<*>> = [],
-    val payload: Array<KClass<out Payload>> = []
-)
-
-class ToppingsValidator :
-    ConstraintValidator<ValidToppings, Toppings> {
-    override fun isValid(value: Toppings, context: ConstraintValidatorContext?): Boolean {
-        return value.map { it.length }.sum() > 0
     }
 }

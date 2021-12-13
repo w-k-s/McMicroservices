@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.post
 import org.zalando.problem.Status
 import org.zalando.problem.violations.ConstraintViolationProblem
 import org.zalando.problem.violations.Violation
@@ -21,6 +23,9 @@ internal class OrderControllerIT : BaseSpringBootTest() {
     @Autowired
     private lateinit var controller: OrderController
 
+    @Autowired
+    private lateinit var mockMvc: MockMvc
+
     @AfterEach
     fun tearDown() {
         orderRepository.deleteAll()
@@ -34,49 +39,53 @@ internal class OrderControllerIT : BaseSpringBootTest() {
     @Test
     fun `GIVEN empty list of toppings WHEN creating order THEN bad request is returned`() {
         // GIVEN
-        val orderRequest = "{\"toppings\":[]}"
-        val request = HttpEntity<String>(orderRequest, HttpHeaders().also {
-            it.contentType = MediaType.APPLICATION_JSON
-        })
-
-        // WHEN
-        val orderResponse = restTemplate.postForEntity(
-            "http://localhost:$port/orders/api/v1/orders",
-            request,
-            ConstraintViolationProblem::class.java
-        )
-
-        // THEN
-        assertThat(orderResponse.statusCodeValue).isEqualTo(400)
-        assertThat(orderResponse.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_UTF8)
-        assertThat(orderResponse.body?.title).isEqualTo("Constraint Violation")
-        assertThat(orderResponse.body?.status).isEqualTo(Status.BAD_REQUEST)
-        assertThat(orderResponse.body?.type).isEqualTo(URI.create("https://zalando.github.io/problem/constraint-violation"))
-        assertThat(orderResponse.body?.violations?.first()).usingRecursiveComparison().isEqualTo(Violation("toppings","validation.toppings.required"))
+        mockMvc.post("/orders/api/v1/orders") {
+            contentType = MediaType.APPLICATION_JSON
+            content = "{\"toppings\":[]}"
+        }.andExpect {
+            status { isBadRequest() }
+            header {
+                content {
+                    contentType("application/problem+json;charset=UTF-8")
+                }
+            }
+            content {
+                json(
+                    """{
+                    "title":"Constraint Violation",
+                    "status":400,
+                    "type":"https://zalando.github.io/problem/constraint-violation",
+                    "violations":[{"field":"toppings","message":"Toppings are required"}]
+                }""".trimIndent()
+                )
+            }
+        }
     }
 
     @Test
     fun `GIVEN list of empty toppings WHEN creating order THEN bad request is returned`() {
         // GIVEN
-        val orderRequest = "{\"toppings\":[\"\"]}"
-        val request = HttpEntity<String>(orderRequest, HttpHeaders().also {
-            it.contentType = MediaType.APPLICATION_JSON
-        })
-
-        // WHEN
-        val orderResponse = restTemplate.postForEntity(
-            "http://localhost:$port/orders/api/v1/orders",
-            request,
-            ConstraintViolationProblem::class.java
-        )
-
-        // THEN
-        assertThat(orderResponse.statusCodeValue).isEqualTo(400)
-        assertThat(orderResponse.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_UTF8)
-        assertThat(orderResponse.body?.title).isEqualTo("Constraint Violation")
-        assertThat(orderResponse.body?.status).isEqualTo(Status.BAD_REQUEST)
-        assertThat(orderResponse.body?.type).isEqualTo(URI.create("https://zalando.github.io/problem/constraint-violation"))
-        assertThat(orderResponse.body?.violations?.first()).usingRecursiveComparison().isEqualTo(Violation("toppings","validation.toppings.required"))
+        mockMvc.post("/orders/api/v1/orders") {
+            contentType = MediaType.APPLICATION_JSON
+            content = "{\"toppings\":[\"\",\"\"]}"
+        }.andExpect {
+            status { isBadRequest() }
+            header {
+                content {
+                    contentType("application/problem+json;charset=UTF-8")
+                }
+            }
+            content {
+                json(
+                    """{
+                    "title":"Constraint Violation",
+                    "status":400,
+                    "type":"https://zalando.github.io/problem/constraint-violation",
+                    "violations":[{"field":"items","message":"Must be valid"}]
+                }""".trimIndent()
+                )
+            }
+        }
     }
 
     @Test
@@ -103,20 +112,20 @@ internal class OrderControllerIT : BaseSpringBootTest() {
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(OrderId::class.java, OffsetDateTime::class.java)
             .isEqualTo(
-            OrdersResponse(
-                orders = listOf(
-                    Order(
-                        id = OrderId(),
-                        toppings = Toppings(
-                            "Zucchini",
-                            "Rice",
-                            "Avocado"
-                        ),
-                        status = Order.Status.PREPARING,
-                        version = 1
+                OrdersResponse(
+                    orders = listOf(
+                        Order(
+                            id = OrderId(),
+                            toppings = Toppings(
+                                "Zucchini",
+                                "Rice",
+                                "Avocado"
+                            ),
+                            status = Order.Status.PREPARING,
+                            version = 1
+                        )
                     )
                 )
             )
-        )
     }
 }

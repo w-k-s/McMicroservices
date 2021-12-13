@@ -1,19 +1,37 @@
 package io.wks.mcmicroservices.orderservice
 
+import io.konform.validation.Validation
+import io.konform.validation.jsonschema.minItems
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.context.request.NativeWebRequest
+import org.zalando.problem.Problem
 import org.zalando.problem.spring.web.advice.ProblemHandling
-import javax.validation.*
+import org.zalando.problem.violations.ConstraintViolationProblem
+import javax.validation.ConstraintViolationException
 
-data class OrderRequest(
-    /*
-     * TODO: I'd prefer this validation to go in the constructor.
-     * When I tried, the Problem library was throwing a jackson error (failed to deserialize request json)
-     * rather than a validation problem.
-     */
-    @field:ValidToppings(message = "validation.toppings.required")
-    val toppings: Toppings
-)
+data class OrderRequest(val toppings: Toppings) {
+    init {
+        Validation<OrderRequest>{
+            OrderRequest::toppings {
+                minItems(1) hint "Toppings are required"
+            }
+        }(this).raiseProblem()
+    }
+
+    class Builder(
+        val toppings: Toppings? = null
+    ) {
+        init {
+            Validation<Builder>{
+                Builder::toppings required {}
+            }(this).raiseProblem()
+        }
+
+        fun build() = OrderRequest(requireNotNull(toppings))
+    }
+}
 
 data class OrdersResponse(
     val orders: List<Order>
@@ -24,8 +42,8 @@ data class OrdersResponse(
 class OrderController(private val orderService: OrderService) {
 
     @PostMapping
-    fun createOrder(@Valid @RequestBody request: OrderRequest): ResponseEntity<*> {
-        return ResponseEntity.ok(orderService.createOrder(request))
+    fun createOrder(@RequestBody request: OrderRequest.Builder): ResponseEntity<*> {
+        return ResponseEntity.ok(orderService.createOrder(request.build()))
     }
 
     @GetMapping
@@ -35,4 +53,14 @@ class OrderController(private val orderService: OrderService) {
 }
 
 @ControllerAdvice
-class ExceptionHandler : ProblemHandling
+class ExceptionHandler : ProblemHandling{
+    override fun handleMessageNotReadableException(
+        exception: HttpMessageNotReadableException,
+        request: NativeWebRequest
+    ): ResponseEntity<Problem> {
+        return when(val cause = exception.mostSpecificCause){
+            is ConstraintViolationProblem -> ResponseEntity.badRequest().body(cause)
+            else -> super.handleMessageNotReadableException(exception, request)
+        }
+    }
+}

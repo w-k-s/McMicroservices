@@ -19,18 +19,6 @@ class OrderRequestTest {
     }
 
     @Test
-    fun `GIVEN an order request with no toppings WHEN it is serialized to json THEN toppings is empty array`(){
-        // GIVEN
-        val request = OrderRequest(toppings = Toppings())
-
-        // WHEN
-        val json = jacksonObjectMapper().writeValueAsString(request)
-
-        // THEN
-        assertThat(json).isEqualTo("{\"toppings\":[]}")
-    }
-
-    @Test
     fun `GIVEN an order request json WHEN it is deserialized to json THEN matching object is created`(){
         // GIVEN
         val originalOrderRequest = OrderRequest(toppings = Toppings("Cheese","Ketchup"))

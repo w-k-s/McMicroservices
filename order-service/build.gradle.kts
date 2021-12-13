@@ -18,6 +18,9 @@ repositories {
 object problem{
     const val version = "0.26.0"
 }
+object konform {
+    const val version = "0.3.0"
+}
 
 extra["springCloudVersion"] = "2021.0.0"
 extra["testcontainersVersion"] = "1.16.2"
@@ -25,13 +28,13 @@ extra["testcontainersVersion"] = "1.16.2"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
-    implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("org.liquibase:liquibase-core")
     implementation("org.zalando:problem-spring-web:${problem.version}")
+    implementation("io.konform:konform-jvm:${konform.version}")
     implementation("org.springframework.cloud:spring-cloud-stream")
     implementation("org.springframework.cloud:spring-cloud-stream-binder-kafka")
     implementation("org.springframework.kafka:spring-kafka")
