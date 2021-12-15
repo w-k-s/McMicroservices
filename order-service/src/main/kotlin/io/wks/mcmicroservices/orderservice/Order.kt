@@ -70,3 +70,5 @@ data class Order(
         FAILED
     }
 }
+
+data class OrderCreatedEvent(val order: Order)

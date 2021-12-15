@@ -4,16 +4,12 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.http.HttpEntity
-import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.zalando.problem.Status
-import org.zalando.problem.violations.ConstraintViolationProblem
-import org.zalando.problem.violations.Violation
-import java.net.URI
 import java.time.OffsetDateTime
+import java.util.concurrent.TimeUnit
 
 internal class OrderControllerIT : BaseSpringBootTest() {
 
@@ -26,9 +22,13 @@ internal class OrderControllerIT : BaseSpringBootTest() {
     @Autowired
     private lateinit var mockMvc: MockMvc
 
+    @Autowired
+    private lateinit var orderCreatedConsumer: OrderCreatedTopicConsumer
+
     @AfterEach
     fun tearDown() {
         orderRepository.deleteAll()
+        orderCreatedConsumer.clear()
     }
 
     @Test
@@ -92,40 +92,37 @@ internal class OrderControllerIT : BaseSpringBootTest() {
     fun `GIVEN toppings WHEN creating order THEN order is created and can be retrieved`() {
         // GIVEN
         val orderRequest = OrderRequest(toppings = Toppings("Zucchini", "Rice", "Avocado"))
+        mockMvc.post("/orders/api/v1/orders") {
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(orderRequest)
+        }.andExpect {
+            status { isOk() }
+        }
 
-        // WHEN
-        val orderResponse = restTemplate.postForEntity(
-            "http://localhost:$port/orders/api/v1/orders",
-            orderRequest,
-            String::class.java
-        )
+        mockMvc.get("/orders/api/v1/orders") {
+            contentType = MediaType.APPLICATION_JSON
+        }.andExpect {
+            status { isOk() }
+            content{
+                json("""{
+                    "orders":[{
+                        "toppings":["Avocado","Rice","Zucchini"],
+                        "status":"PREPARING",
+                        "version":1
+                    }]
+                }""".trimIndent())
+            }
+        }
 
-        // THEN
-        assertThat(orderResponse.statusCodeValue).isEqualTo(200)
-
-        val ordersResponse = restTemplate.getForEntity(
-            "http://localhost:$port/orders/api/v1/orders",
-            OrdersResponse::class.java
-        )
-
-        assertThat(ordersResponse.body)
-            .usingRecursiveComparison()
+        orderCreatedConsumer.latch.await(1, TimeUnit.MINUTES)
+        val order = orderCreatedConsumer.pop()?.order
+        assertThat(order).isNotNull
+        assertThat(order!!).usingRecursiveComparison()
             .ignoringFieldsOfTypes(OrderId::class.java, OffsetDateTime::class.java)
-            .isEqualTo(
-                OrdersResponse(
-                    orders = listOf(
-                        Order(
-                            id = OrderId(),
-                            toppings = Toppings(
-                                "Zucchini",
-                                "Rice",
-                                "Avocado"
-                            ),
-                            status = Order.Status.PREPARING,
-                            version = 1
-                        )
-                    )
-                )
-            )
+            .isEqualTo(Order(
+                id = OrderId(),
+                toppings = orderRequest.toppings,
+                status = Order.Status.PREPARING
+            ))
     }
 }

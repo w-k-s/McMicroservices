@@ -9,7 +9,6 @@ import org.springframework.web.context.request.NativeWebRequest
 import org.zalando.problem.Problem
 import org.zalando.problem.spring.web.advice.ProblemHandling
 import org.zalando.problem.violations.ConstraintViolationProblem
-import javax.validation.ConstraintViolationException
 
 data class OrderRequest(val toppings: Toppings) {
     init {
