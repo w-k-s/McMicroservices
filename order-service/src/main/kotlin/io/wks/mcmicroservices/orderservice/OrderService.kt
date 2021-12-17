@@ -21,6 +21,7 @@ class OrderService(
                 toppings = orderRequest.toppings,
                 status = Order.Status.PREPARING
             ).also {
+                // TODO: Use transactional outbox pattern
                 kafkaTemplate.send("order_created", objectMapper.writeValueAsString(OrderCreatedEvent(it)))
             }
         )
