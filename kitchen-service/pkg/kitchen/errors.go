@@ -18,6 +18,8 @@ const (
 	ErrDatabaseState
 
 	ErrInvalidStockItem
+
+	ErrInsufficientStock
 )
 
 var errorCodeNames = map[ErrorCode]string{
@@ -25,6 +27,7 @@ var errorCodeNames = map[ErrorCode]string{
 	ErrDatabaseConnectivity: "DATABASE_CONNECTIVITY",
 	ErrDatabaseState:        "DATABASE_STATE",
 	ErrInvalidStockItem:     "INVALID_STOCK_ITEM",
+	ErrInsufficientStock:    "INSUFFICIENT_STOCK",
 }
 
 func (c ErrorCode) Name() string {
@@ -39,6 +42,8 @@ func (c ErrorCode) Name() string {
 func (c ErrorCode) Status() int {
 	switch c {
 	case ErrInvalidStockItem:
+		fallthrough
+	case ErrInsufficientStock:
 		return http.StatusBadRequest
 
 	case ErrDatabaseConnectivity:

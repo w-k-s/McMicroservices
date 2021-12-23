@@ -5,11 +5,17 @@ import (
 	"fmt"
 	"log"
 
+	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 )
 
+type StockItemResponse struct {
+	Name  string `json:"name"`
+	Units uint   `json:"units"`
+}
+
 type StockResponse struct {
-	Stock string `json:"stock"`
+	Stock []StockItemResponse `json:"stock"`
 }
 
 type StockService interface {
@@ -42,5 +48,26 @@ func MustStockService(dao db.Dao) StockService {
 }
 
 func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
-	return StockResponse{"Hello World"}, nil
+	var (
+		tx    db.StockTx
+		stock k.Stock
+		err   error
+	)
+
+	tx, err = svc.dao.NewStockTx(ctx)
+	if err != nil {
+		return StockResponse{}, err
+	}
+
+	stock, err = tx.Get(ctx)
+	if err != nil {
+		return StockResponse{}, err
+	}
+
+	items := []StockItemResponse{}
+	for _, item := range stock {
+		items = append(items, StockItemResponse{item.Name(), item.Units()})
+	}
+
+	return StockResponse{items}, nil
 }

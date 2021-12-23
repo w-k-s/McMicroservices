@@ -23,6 +23,7 @@ func (suite *ErrorTestSuite) Test_GIVEN_errorCode_WHEN_mappedToNumber_THEN_mappi
 	assert.Equal(suite.T(), uint64(1001), uint64(ErrDatabaseConnectivity))
 	assert.Equal(suite.T(), uint64(1002), uint64(ErrDatabaseState))
 	assert.Equal(suite.T(), uint64(1003), uint64(ErrInvalidStockItem))
+	assert.Equal(suite.T(), uint64(1004), uint64(ErrInsufficientStock))
 }
 
 func (suite *ErrorTestSuite) Test_GIVEN_errorCode_WHEN_mappedToHttpStatus_THEN_mappingIsCorrect() {
@@ -30,4 +31,5 @@ func (suite *ErrorTestSuite) Test_GIVEN_errorCode_WHEN_mappedToHttpStatus_THEN_m
 	assert.Equal(suite.T(), http.StatusInternalServerError, ErrDatabaseConnectivity.Status())
 	assert.Equal(suite.T(), http.StatusInternalServerError, ErrDatabaseState.Status())
 	assert.Equal(suite.T(), http.StatusBadRequest, ErrInvalidStockItem.Status())
+	assert.Equal(suite.T(), http.StatusBadRequest, ErrInsufficientStock.Status())
 }

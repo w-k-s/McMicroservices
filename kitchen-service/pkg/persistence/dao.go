@@ -14,7 +14,7 @@ type StockTx interface {
 	Commit() error
 	Rollback() error
 
-	Increase(ctx context.Context, stock k.Stock) error
-	Decrease(ctx context.Context, decrease k.Stock) error
-	Get(ctx context.Context) (k.Stock, error)
+	Increase(ctx context.Context, stock k.Stock) k.Error
+	Decrease(ctx context.Context, decrease k.Stock) k.Error
+	Get(ctx context.Context) (k.Stock, k.Error)
 }
