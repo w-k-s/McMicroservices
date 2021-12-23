@@ -59,12 +59,12 @@ func (app *App) registerHealthEndpoint(mux *http.ServeMux) {
 }
 
 func (app *App) registerStockEndpoint(mux *http.ServeMux) {
-	dao := db.MustOpenDao(
+	stockDao := db.MustOpenStockDao(
 		app.config.Database().DriverName(),
 		app.config.Database().ConnectionString(),
 	)
 
-	stockService := svc.MustStockService(dao)
+	stockService := svc.MustStockService(stockDao)
 	stockHandler := NewStockHandler(stockService)
 
 	mux.HandleFunc("/kitchen/api/v1/stock", func(w http.ResponseWriter, r *http.Request) {

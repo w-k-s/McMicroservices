@@ -7,18 +7,32 @@ import (
 	"log"
 
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
+	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 )
 
-type stockTx struct {
-	*sql.Tx
+type defaultStockDao struct {
+	*RootDao
 }
 
-func (s stockTx) Increase(ctx context.Context, stock k.Stock) k.Error {
+func MustOpenStockDao(driverName, dataSourceName string) dao.StockDao {
+	var db *sql.DB
 	var err error
-	defer DeferRollback(s.Tx, "Increase Stock")
+	if db, err = sql.Open(driverName, dataSourceName); err != nil {
+		log.Fatalf("Failed to connect to data source: %q with driver driver: %q. Reason: %s", dataSourceName, driverName, err)
+	}
+	return &defaultStockDao{&RootDao{db}}
+}
+
+func (d defaultStockDao) Close() error {
+	return d.db.Close()
+}
+
+func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {
+	var err error
+	defer DeferRollback(tx, "Increase Stock")
 
 	for _, item := range stock {
-		_, err = s.ExecContext(
+		_, err = tx.ExecContext(
 			ctx,
 			`INSERT INTO 
 				kitchen.stock (name, units) 
@@ -46,15 +60,15 @@ func (s stockTx) Increase(ctx context.Context, stock k.Stock) k.Error {
 		}
 	}
 
-	return Commit(s.Tx)
+	return Commit(tx)
 }
 
-func (s stockTx) Decrease(ctx context.Context, stock k.Stock) k.Error {
+func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {
 	var err error
-	defer DeferRollback(s.Tx, "Decrease Stock")
+	defer DeferRollback(tx, "Decrease Stock")
 
 	for _, item := range stock {
-		_, err = s.ExecContext(
+		_, err = tx.ExecContext(
 			ctx,
 			`UPDATE 
 				kitchen.stock 
@@ -70,17 +84,17 @@ func (s stockTx) Decrease(ctx context.Context, stock k.Stock) k.Error {
 			return k.NewError(k.ErrInsufficientStock, fmt.Sprintf("Not enough stock of %q", item.Name()), err)
 		}
 	}
-	return Commit(s.Tx)
+	return Commit(tx)
 }
 
-func (s stockTx) Get(ctx context.Context) (k.Stock, k.Error) {
+func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
-	defer DeferRollback(s.Tx, "Decrease Stock")
+	defer DeferRollback(tx, "Decrease Stock")
 
-	rows, err = s.QueryContext(
+	rows, err = tx.QueryContext(
 		ctx,
 		`SELECT 
 			s.name,

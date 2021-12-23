@@ -1,7 +1,6 @@
 package persistence
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -9,33 +8,33 @@ import (
 
 	"github.com/cenkalti/backoff"
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
-	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 )
 
-type defaultDao struct {
+type RootDao struct {
 	db *sql.DB
 }
 
-func MustOpenDao(driverName, dataSourceName string) *defaultDao {
-	var (
-		db  *sql.DB
-		err error
-	)
-	if db, err = sql.Open(driverName, dataSourceName); err != nil {
-		log.Fatalf("Failed to connect to data source: %q with driver driver: %q. Reason: %s", dataSourceName, driverName, err)
-	}
-	return &defaultDao{db}
-}
-
-func (d defaultDao) NewStockTx(ctx context.Context) (dao.StockTx, error) {
+func (r *RootDao) BeginTx() (*sql.Tx, k.Error) {
 	var (
 		tx  *sql.Tx
 		err error
 	)
-	if tx, err = d.db.BeginTx(ctx, nil); err != nil {
-		return stockTx{}, err
+	if tx, err = r.db.Begin(); err != nil {
+		return nil, k.NewError(k.ErrDatabaseState, "Failed to begin transaction", err)
 	}
-	return stockTx{tx}, nil
+	return tx, nil
+}
+
+func (r *RootDao) MustBeginTx() *sql.Tx {
+	var (
+		tx  *sql.Tx
+		err error
+	)
+
+	if tx, err = r.db.Begin(); err != nil {
+		log.Fatalf("Failed to begin transaction. Reason: %s", err)
+	}
+	return tx
 }
 
 func PingWithBackOff(db *sql.DB) error {

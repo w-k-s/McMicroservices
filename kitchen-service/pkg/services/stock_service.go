@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 
@@ -23,25 +24,25 @@ type StockService interface {
 }
 
 type stockService struct {
-	dao db.Dao
+	stockDao db.StockDao
 }
 
-func NewStockService(dao db.Dao) (StockService, error) {
-	if dao == nil {
-		return nil, fmt.Errorf("can not create account service. dao is nil")
+func NewStockService(stockDao db.StockDao) (StockService, error) {
+	if stockDao == nil {
+		return nil, fmt.Errorf("can not create account service. stockDao is nil")
 	}
 
 	return &stockService{
-		dao: dao,
+		stockDao: stockDao,
 	}, nil
 }
 
-func MustStockService(dao db.Dao) StockService {
+func MustStockService(stockDao db.StockDao) StockService {
 	var (
 		svc StockService
 		err error
 	)
-	if svc, err = NewStockService(dao); err != nil {
+	if svc, err = NewStockService(stockDao); err != nil {
 		log.Fatalf(err.Error())
 	}
 	return svc
@@ -49,17 +50,17 @@ func MustStockService(dao db.Dao) StockService {
 
 func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 	var (
-		tx    db.StockTx
 		stock k.Stock
+		tx    *sql.Tx
 		err   error
 	)
 
-	tx, err = svc.dao.NewStockTx(ctx)
+	tx, err = svc.stockDao.BeginTx()
 	if err != nil {
 		return StockResponse{}, err
 	}
 
-	stock, err = tx.Get(ctx)
+	stock, err = svc.stockDao.Get(ctx, tx)
 	if err != nil {
 		return StockResponse{}, err
 	}

@@ -1,0 +1,143 @@
+package test
+
+import (
+	"context"
+	"log"
+	"testing"
+
+	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
+	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
+)
+
+type StockDaoTestSuite struct {
+	suite.Suite
+	stockDao dao.StockDao
+}
+
+func TestStockDaoTestSuite(t *testing.T) {
+	suite.Run(t, new(StockDaoTestSuite))
+}
+
+// -- SETUP
+
+func (suite *StockDaoTestSuite) SetupTest() {
+	suite.stockDao = testStockDao
+}
+
+// -- TEARDOWN
+
+func (suite *StockDaoTestSuite) TearDownTest() {
+	if err := ClearTables(); err != nil {
+		log.Fatalf("Failed to tear down StockDaoTestSuite: %s", err)
+	}
+}
+
+// -- SUITE
+
+func (suite *StockDaoTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
+	// GIVEN
+	ctx := context.Background()
+	increaseTx, _ := suite.stockDao.BeginTx()
+
+	// WHEN
+	item1, _ := k.NewStockItem("Cheese", 5)
+	item2, _ := k.NewStockItem("Donuts", 7)
+	assert.Nil(suite.T(), suite.stockDao.Increase(ctx, increaseTx, k.Stock{item1, item2}), "Increase returned error")
+	assert.Nil(suite.T(), increaseTx.Commit(), "Commit returned error")
+
+	// THEN
+	getTx := suite.stockDao.MustBeginTx()
+	stock, err := suite.stockDao.Get(ctx, getTx)
+	assert.Nil(suite.T(), getTx.Commit())
+
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "Cheese", stock[0].Name())
+	assert.Equal(suite.T(), uint(5), stock[0].Units())
+	assert.Equal(suite.T(), "Donuts", stock[1].Name())
+	assert.Equal(suite.T(), uint(7), stock[1].Units())
+}
+
+func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
+	// GIVEN
+	ctx := context.Background()
+	givenTx := suite.stockDao.MustBeginTx()
+
+	item1, _ := k.NewStockItem("Cheese", 5)
+	item2, _ := k.NewStockItem("Donuts", 7)
+	assert.Nil(suite.T(), suite.stockDao.Increase(ctx, givenTx, k.Stock{item1, item2}), "Increase returned error")
+	assert.Nil(suite.T(), givenTx.Commit(), "Commit returned error")
+
+	// WHEN
+	increaseTx := suite.stockDao.MustBeginTx()
+	item1Addition, _ := k.NewStockItem("Cheese", 5)
+	item2Addition, _ := k.NewStockItem("Donuts", 3)
+	assert.Nil(suite.T(), suite.stockDao.Increase(ctx, increaseTx, k.Stock{item1Addition, item2Addition}), "Increase returned error")
+	assert.Nil(suite.T(), increaseTx.Commit(), "Commit returned error")
+
+	// THEN
+	getTx := suite.stockDao.MustBeginTx()
+	stock, err := suite.stockDao.Get(ctx, getTx)
+	assert.Nil(suite.T(), getTx.Commit())
+
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "Cheese", stock[0].Name())
+	assert.Equal(suite.T(), uint(10), stock[0].Units())
+	assert.Equal(suite.T(), "Donuts", stock[1].Name())
+	assert.Equal(suite.T(), uint(10), stock[1].Units())
+}
+
+func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreased_THEN_totalStockIsCorrect() {
+	// GIVEN
+	ctx := context.Background()
+	givenTx := suite.stockDao.MustBeginTx()
+
+	item1, _ := k.NewStockItem("Cheese", 5)
+	item2, _ := k.NewStockItem("Donuts", 7)
+	assert.Nil(suite.T(), suite.stockDao.Increase(ctx, givenTx, k.Stock{item1, item2}), "Increase returned error")
+	assert.Nil(suite.T(), givenTx.Commit(), "Commit returned error")
+
+	// WHEN
+	decreaseTx := suite.stockDao.MustBeginTx()
+	item1Addition, _ := k.NewStockItem("Cheese", 4)
+	item2Addition, _ := k.NewStockItem("Donuts", 2)
+	assert.Nil(suite.T(), suite.stockDao.Decrease(ctx, decreaseTx, k.Stock{item1Addition, item2Addition}), "Increase returned error")
+	assert.Nil(suite.T(), decreaseTx.Commit(), "Commit returned error")
+
+	// THEN
+	getTx := suite.stockDao.MustBeginTx()
+	stock, err := suite.stockDao.Get(ctx, getTx)
+	assert.Nil(suite.T(), getTx.Commit())
+
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "Cheese", stock[0].Name())
+	assert.Equal(suite.T(), uint(1), stock[0].Units())
+	assert.Equal(suite.T(), "Donuts", stock[1].Name())
+	assert.Equal(suite.T(), uint(1), stock[1].Units())
+}
+
+func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvailability_THEN_errorIsReturned() {
+	// GIVEN
+	ctx := context.Background()
+	givenTx := suite.stockDao.MustBeginTx()
+
+	item1, _ := k.NewStockItem("Cheese", 5)
+	item2, _ := k.NewStockItem("Donuts", 7)
+	assert.Nil(suite.T(), suite.stockDao.Increase(ctx, givenTx, k.Stock{item1, item2}), "Increase returned error")
+	assert.Nil(suite.T(), givenTx.Commit(), "Commit returned error")
+
+	// WHEN
+	decreaseTx := suite.stockDao.MustBeginTx()
+	item1Addition, _ := k.NewStockItem("Cheese", 7)
+	item2Addition, _ := k.NewStockItem("Donuts", 10)
+	err := suite.stockDao.Decrease(ctx, decreaseTx, k.Stock{item1Addition, item2Addition})
+
+	// THEN
+	assert.NotNil(suite.T(), err)
+
+	kitchenError := err.(k.Error)
+	assert.Equal(suite.T(), k.ErrInsufficientStock, kitchenError.Code())
+	assert.Equal(suite.T(), "Category names must be unique. One of these is duplicated: Shopping, Shopping", kitchenError.Error())
+}

@@ -2,19 +2,23 @@ package persistence
 
 import (
 	"context"
+	"database/sql"
 
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 )
 
 type Dao interface {
-	NewStockTx(ctx context.Context) (StockTx, error)
+	BeginTx() (*sql.Tx, error)
+	MustBeginTx() *sql.Tx
 }
 
-type StockTx interface {
-	Commit() error
-	Rollback() error
+type StockDao interface {
+	BeginTx() (*sql.Tx, k.Error)
+	MustBeginTx() *sql.Tx
 
-	Increase(ctx context.Context, stock k.Stock) k.Error
-	Decrease(ctx context.Context, decrease k.Stock) k.Error
-	Get(ctx context.Context) (k.Stock, k.Error)
+	Close() error
+
+	Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error
+	Decrease(ctx context.Context, tx *sql.Tx, decrease k.Stock) k.Error
+	Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error)
 }
