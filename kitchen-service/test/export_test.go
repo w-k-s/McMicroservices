@@ -19,7 +19,7 @@ import (
 const (
 	testContainerPostgresUser     = "test"
 	testContainerPostgresPassword = "test"
-	testContainerPostgresDB       = "simple_budget_tracker"
+	testContainerPostgresDB       = "kitchen"
 	testContainerDriverName       = "postgres"
 )
 

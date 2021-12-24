@@ -60,8 +60,14 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 		return StockResponse{}, err
 	}
 
+	defer db.DeferRollback(tx, "GetStock")
+
 	stock, err = svc.stockDao.Get(ctx, tx)
 	if err != nil {
+		return StockResponse{}, err
+	}
+
+	if err = db.Commit(tx); err != nil {
 		return StockResponse{}, err
 	}
 

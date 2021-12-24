@@ -60,4 +60,5 @@ func MustRunMigrations(dbConfig config.DBConfig) {
 	if err := RunMigrations(dbConfig); err != nil {
 		log.Fatalf("Failed to run migrations. Reason: %s", err)
 	}
+	log.Printf("Migrations applied")
 }

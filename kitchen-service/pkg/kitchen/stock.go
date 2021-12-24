@@ -51,3 +51,7 @@ func (s StockItem) String() string {
 }
 
 type Stock []StockItem
+
+func (ss Stock) Len() int           { return len(ss) }
+func (ss Stock) Swap(i, j int)      { ss[i], ss[j] = ss[j], ss[i] }
+func (ss Stock) Less(i, j int) bool { return ss[i].Name() < ss[j].Name() }

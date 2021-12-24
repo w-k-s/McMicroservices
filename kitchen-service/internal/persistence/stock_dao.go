@@ -29,62 +29,70 @@ func (d defaultStockDao) Close() error {
 
 func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {
 	var err error
-	defer DeferRollback(tx, "Increase Stock")
 
 	for _, item := range stock {
 		_, err = tx.ExecContext(
 			ctx,
 			`INSERT INTO 
-				kitchen.stock (name, units) 
+				kitchen.stock (item_name, units) 
 			VALUES 
-				(?,?) 
+				($1,$2) 
 			ON CONFLICT 
 				ON CONSTRAINT uq_stock_name 
 			DO UPDATE SET 
 				units = (
 					SELECT 
-						units+?
+						units+$2
 					FROM 
 						kitchen.stock 
 					WHERE 
-						name = ?
-				);`,
+						LOWER(item_name) = LOWER($1)
+				)`,
 			item.Name(),
 			item.Units(),
-			item.Units(),
-			item.Name(),
 		)
 
 		if err != nil {
-			return k.NewError(k.ErrDatabaseState, fmt.Sprintf("Failed to increase stock of %q", item.Name()), err)
+			return k.NewError(k.ErrDatabaseState, fmt.Sprintf("Failed to increase stock of %q, Reason: %q", item.Name(), err.Error()), err)
 		}
 	}
 
-	return Commit(tx)
+	return nil
 }
 
 func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {
-	var err error
-	defer DeferRollback(tx, "Decrease Stock")
+	var (
+		res          sql.Result
+		rowsAffected int64
+		err          error
+	)
 
 	for _, item := range stock {
-		_, err = tx.ExecContext(
+		res, err = tx.ExecContext(
 			ctx,
 			`UPDATE 
 				kitchen.stock 
 			SET 
-				units = units - ?
+				units = units - $2
 			WHERE 
-				name = ?;`,
-			item.Units(),
+				item_name = $1
+			AND 
+				units >= $2`,
 			item.Name(),
+			item.Units(),
 		)
 
 		if err != nil {
-			return k.NewError(k.ErrInsufficientStock, fmt.Sprintf("Not enough stock of %q", item.Name()), err)
+			return k.NewError(k.ErrDatabaseState, fmt.Sprintf("Failed to update stock of %q", item.Name()), err)
+		}
+		if rowsAffected, err = res.RowsAffected(); err != nil {
+			return k.NewError(k.ErrDatabaseState, "Failed to get result of stock update", err)
+		}
+		if rowsAffected == 0 {
+			return k.NewError(k.ErrInsufficientStock, fmt.Sprintf("Insufficient stock of %q", item.Name()), nil)
 		}
 	}
-	return Commit(tx)
+	return nil
 }
 
 func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error) {
@@ -92,12 +100,11 @@ func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error)
 		rows *sql.Rows
 		err  error
 	)
-	defer DeferRollback(tx, "Decrease Stock")
 
 	rows, err = tx.QueryContext(
 		ctx,
 		`SELECT 
-			s.name,
+			s.item_name,
 			s.units
 		FROM 
 			kitchen.stock s`,

@@ -87,10 +87,14 @@ func (e internalError) Fields() map[string]string {
 	return e.fields
 }
 
+func (e internalError) String() string {
+	return e.cause.Error()
+}
+
 func NewError(code ErrorCode, message string, cause error) Error {
 	return &internalError{
 		code:    code,
-		cause:   fmt.Errorf("%w", cause),
+		cause:   fmt.Errorf("%s. Reason: '%w'", message, cause),
 		message: message,
 		fields:  map[string]string{},
 	}

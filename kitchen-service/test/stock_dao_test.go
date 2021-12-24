@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"log"
+	"sort"
 	"testing"
 
 	_ "github.com/lib/pq"
@@ -40,7 +41,7 @@ func (suite *StockDaoTestSuite) TearDownTest() {
 func (suite *StockDaoTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
 	// GIVEN
 	ctx := context.Background()
-	increaseTx, _ := suite.stockDao.BeginTx()
+	increaseTx := suite.stockDao.MustBeginTx()
 
 	// WHEN
 	item1, _ := k.NewStockItem("Cheese", 5)
@@ -52,6 +53,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalS
 	getTx := suite.stockDao.MustBeginTx()
 	stock, err := suite.stockDao.Get(ctx, getTx)
 	assert.Nil(suite.T(), getTx.Commit())
+	sort.Sort(stock)
 
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), "Cheese", stock[0].Name())
@@ -81,6 +83,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsAdded_THEN_totalSto
 	getTx := suite.stockDao.MustBeginTx()
 	stock, err := suite.stockDao.Get(ctx, getTx)
 	assert.Nil(suite.T(), getTx.Commit())
+	sort.Sort(stock)
 
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), "Cheese", stock[0].Name())
@@ -101,21 +104,22 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreased_THEN_tota
 
 	// WHEN
 	decreaseTx := suite.stockDao.MustBeginTx()
-	item1Addition, _ := k.NewStockItem("Cheese", 4)
-	item2Addition, _ := k.NewStockItem("Donuts", 2)
-	assert.Nil(suite.T(), suite.stockDao.Decrease(ctx, decreaseTx, k.Stock{item1Addition, item2Addition}), "Increase returned error")
+	item1Decrease, _ := k.NewStockItem("Cheese", 4)
+	item2Decrease, _ := k.NewStockItem("Donuts", 2)
+	assert.Nil(suite.T(), suite.stockDao.Decrease(ctx, decreaseTx, k.Stock{item1Decrease, item2Decrease}), "Decrease returned error")
 	assert.Nil(suite.T(), decreaseTx.Commit(), "Commit returned error")
 
 	// THEN
 	getTx := suite.stockDao.MustBeginTx()
 	stock, err := suite.stockDao.Get(ctx, getTx)
 	assert.Nil(suite.T(), getTx.Commit())
+	sort.Sort(stock)
 
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), "Cheese", stock[0].Name())
 	assert.Equal(suite.T(), uint(1), stock[0].Units())
 	assert.Equal(suite.T(), "Donuts", stock[1].Name())
-	assert.Equal(suite.T(), uint(1), stock[1].Units())
+	assert.Equal(suite.T(), uint(5), stock[1].Units())
 }
 
 func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvailability_THEN_errorIsReturned() {
@@ -130,14 +134,15 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvai
 
 	// WHEN
 	decreaseTx := suite.stockDao.MustBeginTx()
-	item1Addition, _ := k.NewStockItem("Cheese", 7)
-	item2Addition, _ := k.NewStockItem("Donuts", 10)
-	err := suite.stockDao.Decrease(ctx, decreaseTx, k.Stock{item1Addition, item2Addition})
+	item1Decrease, _ := k.NewStockItem("Cheese", 7)
+	item2Decrease, _ := k.NewStockItem("Donuts", 10)
+	item3Decrease, _ := k.NewStockItem("Fig", 1)
+	err := suite.stockDao.Decrease(ctx, decreaseTx, k.Stock{item1Decrease, item2Decrease, item3Decrease})
 
 	// THEN
 	assert.NotNil(suite.T(), err)
 
 	kitchenError := err.(k.Error)
 	assert.Equal(suite.T(), k.ErrInsufficientStock, kitchenError.Code())
-	assert.Equal(suite.T(), "Category names must be unique. One of these is duplicated: Shopping, Shopping", kitchenError.Error())
+	assert.Equal(suite.T(), "Insufficient stock of \"Cheese\"", kitchenError.Error())
 }
