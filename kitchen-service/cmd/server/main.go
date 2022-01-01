@@ -49,7 +49,9 @@ func main() {
 	if handler, err = app.Init(config); err != nil {
 		log.Fatalf("failed to init application. Reason: %s", err)
 	}
+	defer handler.Close()
 
+	// TODO: Close server smoothly
 	s := &http.Server{
 		Addr:           config.Server().ListenAddress(),
 		Handler:        handler.Router(),

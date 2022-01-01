@@ -18,12 +18,14 @@ import (
 
 type Config struct {
 	server ServerConfig
+	broker BrokerConfig
 	db     DBConfig
 }
 
-func NewConfig(serverConfig ServerConfig, dbConfig DBConfig) (*Config, error) {
+func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DBConfig) (*Config, error) {
 	config := &Config{
 		server: serverConfig,
+		broker: brokerConfig,
 		db:     dbConfig,
 	}
 
@@ -36,6 +38,8 @@ func NewConfig(serverConfig ServerConfig, dbConfig DBConfig) (*Config, error) {
 		&validators.StringLengthInRange{Name: "Database Name", Field: config.db.host, Min: 1, Max: 0, Message: "Database name is required"},
 		&validators.StringInclusion{Name: "Database SSL Mode", Field: config.db.sslMode, List: []string{"disable", "require", "verify-ca", "verify-full"}, Message: "Database SSL Mode is required"},
 		&validators.StringLengthInRange{Name: "Migration Directory", Field: config.db.host, Min: 1, Max: 0, Message: "Migration Directory path is required"},
+		&boostrapServersValidator{Name: "Bootstrap servers", Field: config.broker.boostrapServers},
+		&validators.StringLengthInRange{Name: "Kafka Consumer Group Id", Field: config.broker.consumerConfig.groupId, Min: 1, Max: 0, Message: "Kafka Consumer GroupId is required"},
 	)
 
 	if errors.HasAny() {
@@ -45,12 +49,32 @@ func NewConfig(serverConfig ServerConfig, dbConfig DBConfig) (*Config, error) {
 	return config, nil
 }
 
+type boostrapServersValidator struct {
+	Name  string
+	Field []string
+}
+
+func (v *boostrapServersValidator) IsValid(errors *validate.Errors) {
+	if len(v.Field) == 0 {
+		errors.Add(v.Name, "servers list can not be empty")
+	}
+	for _, server := range v.Field {
+		if len(server) == 0 {
+			errors.Add(v.Name, "server list can not contain empty strings")
+		}
+	}
+}
+
 func (c Config) Server() ServerConfig {
 	return c.server
 }
 
 func (c Config) Database() DBConfig {
 	return c.db
+}
+
+func (c Config) Broker() BrokerConfig {
+	return c.broker
 }
 
 func readToml(bytes []byte) (*Config, error) {
@@ -70,6 +94,15 @@ func readToml(bytes []byte) (*Config, error) {
 			SSLMode      string
 			MigrationDir string `toml:"migration_dir"`
 		}
+		Broker struct {
+			BootrstrapServers []string `toml:"bootstrap_servers"`
+			Consumer          struct {
+				GroupId         string `toml:"group_id"`
+				AutoOffsetReset string `toml:"auto_offset_reset"`
+			}
+			Producer struct {
+			}
+		}
 	}
 
 	err := toml.Unmarshal(bytes, &mutableConfig)
@@ -83,6 +116,14 @@ func readToml(bytes []byte) (*Config, error) {
 			readTimeout:    time.Duration(mutableConfig.Server.ReadTimeoutSeconds) * time.Second,
 			writeTimeout:   time.Duration(mutableConfig.Server.WriteTimeoutSeconds) * time.Second,
 			maxHeaderBytes: mutableConfig.Server.MaxHeaderBytes,
+		},
+		BrokerConfig{
+			boostrapServers: mutableConfig.Broker.BootrstrapServers,
+			consumerConfig: NewConsumerConfig(
+				mutableConfig.Broker.Consumer.GroupId,
+				mutableConfig.Broker.Consumer.AutoOffsetReset,
+			),
+			producerConfig: NewProducerConfig(),
 		},
 		DBConfig{
 			username:     mutableConfig.Database.Username,

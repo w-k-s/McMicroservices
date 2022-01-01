@@ -14,17 +14,11 @@ type defaultStockDao struct {
 	*RootDao
 }
 
-func MustOpenStockDao(driverName, dataSourceName string) dao.StockDao {
-	var db *sql.DB
-	var err error
-	if db, err = sql.Open(driverName, dataSourceName); err != nil {
-		log.Fatalf("Failed to connect to data source: %q with driver driver: %q. Reason: %s", dataSourceName, driverName, err)
+func MustOpenStockDao(pool *sql.DB) dao.StockDao {
+	if pool == nil {
+		log.Fatalf("database is null")
 	}
-	return &defaultStockDao{&RootDao{db}}
-}
-
-func (d defaultStockDao) Close() error {
-	return d.db.Close()
+	return &defaultStockDao{&RootDao{pool}}
 }
 
 func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {

@@ -10,10 +10,10 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
-	"github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
+	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 )
 
-func RunMigrations(dbConfig config.DBConfig) error {
+func RunMigrations(db *sql.DB, dbConfig cfg.DBConfig) error {
 	driverName := dbConfig.DriverName()
 	migrationsDirectory := dbConfig.MigrationDirectory()
 
@@ -22,21 +22,10 @@ func RunMigrations(dbConfig config.DBConfig) error {
 	}
 
 	var (
-		db         *sql.DB
 		driver     database.Driver
 		migrations *migrate.Migrate
 		err        error
 	)
-
-	if db, err = sql.Open(driverName, dbConfig.ConnectionString()); err != nil {
-		return fmt.Errorf("failed to open connection. Reason: %w", err)
-	}
-
-	db.SetMaxIdleConns(0) // Required, otherwise pinging will result in EOF
-
-	if err = PingWithBackOff(db); err != nil {
-		return fmt.Errorf("failed to ping database. Reason: %w", err)
-	}
 
 	if driver, err = postgres.WithInstance(db, &postgres.Config{
 		DatabaseName: dbConfig.Name(),
@@ -56,8 +45,8 @@ func RunMigrations(dbConfig config.DBConfig) error {
 	return nil
 }
 
-func MustRunMigrations(dbConfig config.DBConfig) {
-	if err := RunMigrations(dbConfig); err != nil {
+func MustRunMigrations(pool *sql.DB, dbConfig cfg.DBConfig) {
+	if err := RunMigrations(pool, dbConfig); err != nil {
 		log.Fatalf("Failed to run migrations. Reason: %s", err)
 	}
 	log.Printf("Migrations applied")

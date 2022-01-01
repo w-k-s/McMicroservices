@@ -1,17 +1,25 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
+	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
 type App struct {
-	config *cfg.Config
+	config      *cfg.Config
+	mux         *http.ServeMux
+	topicRouter msg.TopicRouter
+	pool        *sql.DB
+	consumer    *kafka.Consumer
+	producer    *kafka.Producer
 }
 
 func (app *App) Config() *cfg.Config {
@@ -23,29 +31,51 @@ func Init(config *cfg.Config) (*App, error) {
 		return nil, fmt.Errorf("configuration is required. Got %v", nil)
 	}
 
-	db.MustRunMigrations(
-		config.Database(),
-	)
+	pool := db.MustOpenPool(config.Database())
+	consumer, producer := msg.MustNewConsumerProducerPair(config.Broker())
+
+	db.MustRunMigrations(pool, config.Database())
 
 	log.Printf("--- Application Initialized ---")
-	return &App{
-		config: config,
-	}, nil
+	app := &App{
+		config:      config,
+		mux:         http.NewServeMux(),
+		topicRouter: msg.TopicRouter{},
+		pool:        pool,
+		consumer:    consumer,
+		producer:    producer,
+	}
+
+	app.registerHealthEndpoint()
+	app.registerStockEndpoint()
+	app.registerOrderEndpoint()
+
+	msg.Start(app.consumer, app.producer, app.topicRouter)
+
+	return app, nil
+}
+
+func (app *App) Close() {
+	var err error
+	app.producer.Flush(15 * 1000)
+	app.producer.Close()
+	if err = app.consumer.Close(); err != nil {
+		log.Printf("Failed to close consumer. Reason: %q", err.Error())
+	}
+
+	if err = app.pool.Close(); err != nil {
+		log.Printf("Failed to close connection pool. Reason: %q", err.Error())
+	}
 }
 
 func (app *App) Router() *http.ServeMux {
-	mux := http.NewServeMux()
-
-	app.registerHealthEndpoint(mux)
-	app.registerStockEndpoint(mux)
-
-	return mux
+	return app.mux
 }
 
-func (app *App) registerHealthEndpoint(mux *http.ServeMux) {
+func (app *App) registerHealthEndpoint() {
 	healthHandler := MustHealthHandler(app.config)
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	app.mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		var handle http.HandlerFunc
 		switch r.Method {
 		case http.MethodGet:
@@ -58,16 +88,12 @@ func (app *App) registerHealthEndpoint(mux *http.ServeMux) {
 	})
 }
 
-func (app *App) registerStockEndpoint(mux *http.ServeMux) {
-	stockDao := db.MustOpenStockDao(
-		app.config.Database().DriverName(),
-		app.config.Database().ConnectionString(),
-	)
-
+func (app *App) registerStockEndpoint() {
+	stockDao := db.MustOpenStockDao(app.pool)
 	stockService := svc.MustStockService(stockDao)
 	stockHandler := NewStockHandler(stockService)
 
-	mux.HandleFunc("/kitchen/api/v1/stock", func(w http.ResponseWriter, r *http.Request) {
+	app.mux.HandleFunc("/kitchen/api/v1/stock", func(w http.ResponseWriter, r *http.Request) {
 		var handle http.HandlerFunc
 		switch r.Method {
 		case http.MethodGet:
@@ -78,4 +104,12 @@ func (app *App) registerStockEndpoint(mux *http.ServeMux) {
 		}
 		handle(w, r)
 	})
+}
+
+func (app *App) registerOrderEndpoint() {
+	stockDao := db.MustOpenStockDao(app.pool)
+	orderService := svc.MustOrderService(stockDao)
+	orderHandler := NewOrderHandler(orderService)
+
+	app.topicRouter[CreateOrder] = orderHandler.HandleOrderMessage
 }

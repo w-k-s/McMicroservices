@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sort"
 
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
@@ -71,6 +72,7 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 		return StockResponse{}, err
 	}
 
+	sort.Sort(stock)
 	items := []StockItemResponse{}
 	for _, item := range stock {
 		items = append(items, StockItemResponse{item.Name(), item.Units()})
