@@ -5,14 +5,14 @@ go 1.17
 require (
 	github.com/aws/aws-sdk-go v1.39.6
 	github.com/cenkalti/backoff v2.2.1+incompatible
-	github.com/confluentinc/confluent-kafka-go v1.8.2
+	github.com/confluentinc/confluent-kafka-go v1.4.2
 	github.com/gobuffalo/validate v2.0.4+incompatible
 	github.com/golang-migrate/migrate/v4 v4.14.1
+	github.com/gorilla/mux v1.8.0
 	github.com/lib/pq v1.10.2
 	github.com/pelletier/go-toml/v2 v2.0.0-beta.3
 	github.com/stretchr/testify v1.7.1-0.20210427113832-6241f9ab9942
 	github.com/testcontainers/testcontainers-go v0.11.0
-	github.com/w-k-s/simple-budget-tracker v0.0.0-20210922193714-b4439dddc9be
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	schneider.vip/problem v1.6.0
 )
@@ -22,8 +22,6 @@ require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3 // indirect
 	github.com/Microsoft/hcsshim v0.8.16 // indirect
-	github.com/bojanz/currency v0.0.0-20211125231711-7deaabae9019 // indirect
-	github.com/cockroachdb/apd/v2 v2.0.2 // indirect
 	github.com/containerd/cgroups v0.0.0-20210114181951-8a68de567b68 // indirect
 	github.com/containerd/containerd v1.5.0-beta.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

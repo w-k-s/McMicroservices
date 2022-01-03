@@ -156,10 +156,14 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesEx
 	assert.Equal(suite.T(), "jack.torrence", config.Database().Username())
 	assert.Equal(suite.T(), "password", config.Database().Password())
 	assert.Equal(suite.T(), "overlook", config.Database().Name())
-	assert.Equal(suite.T(), "budget", config.Database().Schema())
+	assert.Equal(suite.T(), "kitchen", config.Database().Schema())
 	assert.Equal(suite.T(), 5432, config.Database().Port())
 	assert.Equal(suite.T(), "disable", config.Database().SslMode())
 	assert.Equal(suite.T(), "host=localhost port=5432 user=jack.torrence password=password dbname=overlook sslmode=disable", config.Database().ConnectionString())
+	assert.Equal(suite.T(), []string{"localhost"}, config.Broker().BootstrapServers())
+	assert.Equal(suite.T(), "group_id", config.Broker().ConsumerConfig().GroupId())
+	assert.Equal(suite.T(), "earliest", config.Broker().ConsumerConfig().AutoOffsetReset())
+	assert.Equal(suite.T(), "plaintext", config.Broker().SecurityProtocol())
 }
 
 func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileIsEmpty_THEN_errorIsReturned() {
@@ -180,6 +184,8 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileIsEmpt
 	assert.Contains(suite.T(), err.Error(), "Database password is required")
 	assert.Contains(suite.T(), err.Error(), "Database port is required")
 	assert.Contains(suite.T(), err.Error(), "Database name is required")
+	assert.Contains(suite.T(), err.Error(), "servers list can not be empty")
+	assert.Contains(suite.T(), err.Error(), "Kafka Consumer GroupId is required")
 }
 
 func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesNotContainValidToml_THEN_errorIsReturned() {

@@ -17,26 +17,47 @@ import (
 )
 
 const (
-	testContainerPostgresUser     = "test"
-	testContainerPostgresPassword = "test"
-	testContainerPostgresDB       = "kitchen"
-	testContainerDriverName       = "postgres"
+	testContainerPostgresUser       = "test"
+	testContainerPostgresPassword   = "test"
+	testContainerPostgresDB         = "kitchen"
+	testContainerDatabaseDriverName = "postgres"
 )
 
 var (
-	testContainerContext        context.Context
-	testPostgresContainer       tc.Container
-	testContainerDataSourceName string
-	testDB                      *sql.DB
-	testStockDao                dao.StockDao
-	testConfig                  *cfg.Config
-	testApp                     *app.App
-	err                         error
+	testContainerDatabaseContext context.Context
+	testContainerPostgres        tc.Container
+	testContainerDataSourceName  string
+	testDB                       *sql.DB
+	testKafkaCluster             *KafkaCluster
+	testStockDao                 dao.StockDao
+	testConfig                   *cfg.Config
+	testApp                      *app.App
+	err                          error
 )
 
 func init() {
+	if testConfig, _ = cfg.NewConfig(
+		cfg.NewServerConfigBuilder().
+			SetPort(9898).
+			Build(),
+		requestKafkaTestContainer(),
+		requestDatabaseTestContainer(),
+	); err != nil {
+		log.Fatalf("Failed to configure application for tests. Reason: %s", err)
+	}
 
-	req := tc.ContainerRequest{
+	testDB = db.MustOpenPool(testConfig.Database())
+	db.MustRunMigrations(testDB, testConfig.Database())
+
+	testStockDao = db.MustOpenStockDao(testDB)
+
+	if testApp, err = app.Init(testConfig); err != nil {
+		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
+	}
+}
+
+func requestDatabaseTestContainer() cfg.DBConfig {
+	testContainerDatabaseReq := tc.ContainerRequest{
 		Image:        "postgres:11.6-alpine",
 		ExposedPorts: []string{"5432/tcp"},
 		Env: map[string]string{
@@ -47,45 +68,40 @@ func init() {
 		WaitingFor: wait.ForLog("database system is ready to accept connections"),
 	}
 
-	testContainerContext = context.Background()
-	testPostgresContainer, err = tc.GenericContainer(testContainerContext, tc.GenericContainerRequest{
-		ContainerRequest: req,
+	testContainerDatabaseContext = context.Background()
+	testContainerPostgres, err = tc.GenericContainer(testContainerDatabaseContext, tc.GenericContainerRequest{
+		ContainerRequest: testContainerDatabaseReq,
 		Started:          true,
 	})
 	if err != nil {
 		log.Fatalf("Failed to request postgres test container: %s", err)
 	}
 
-	containerHost, _ := testPostgresContainer.Host(testContainerContext)
-	containerPort, _ := testPostgresContainer.MappedPort(testContainerContext, "5432")
-	testContainerDataSourceName = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", containerHost, containerPort.Int(), testContainerPostgresUser, testContainerPostgresPassword, testContainerPostgresDB)
+	postgresHost, _ := testContainerPostgres.Host(testContainerDatabaseContext)
+	postgresPort, _ := testContainerPostgres.MappedPort(testContainerDatabaseContext, "5432")
 
-	if testConfig, _ = cfg.NewConfig(
-		cfg.NewServerConfigBuilder().
-			SetPort(9898).
-			Build(),
-		cfg.NewDBConfigBuilder().
-			SetUsername(testContainerPostgresUser).
-			SetPassword(testContainerPostgresPassword).
-			SetHost(containerHost).
-			SetPort(containerPort.Int()).
-			SetName(testContainerDataSourceName).
-			Build(),
-	); err != nil {
-		log.Fatalf("Failed to configure application for tests. Reason: %s", err)
-	}
+	testContainerDataSourceName = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", postgresHost, postgresPort.Int(), testContainerPostgresUser, testContainerPostgresPassword, testContainerPostgresDB)
 
-	db.MustRunMigrations(testConfig.Database())
+	return cfg.NewDBConfigBuilder().
+		SetUsername(testContainerPostgresUser).
+		SetPassword(testContainerPostgresPassword).
+		SetHost(postgresHost).
+		SetPort(postgresPort.Int()).
+		SetName(testContainerDataSourceName).
+		Build()
+}
 
-	if testDB, err = sql.Open(testContainerDriverName, testContainerDataSourceName); err != nil {
-		log.Fatalf("Failed to connect to data source: %q with driver driver: %q. Reason: %s", testContainerDriverName, testContainerDataSourceName, err)
-	}
+func requestKafkaTestContainer() cfg.BrokerConfig {
+	testKafkaCluster = NewKafkaCluster()
+	testKafkaCluster.StartCluster()
+	
+	log.Printf("\nBoostrap Servers: %s\n", testKafkaCluster.GetKafkaHost())
 
-	testStockDao = db.MustOpenStockDao(testContainerDriverName, testContainerDataSourceName)
-
-	if testApp, err = app.Init(testConfig); err != nil {
-		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
-	}
+	return cfg.NewBrokerConfig(
+		[]string{testKafkaCluster.GetKafkaHost()},
+		"plaintext",
+		cfg.NewConsumerConfig("group_id", "earliest"),
+	)
 }
 
 func TestMain(m *testing.M) {
@@ -93,11 +109,9 @@ func TestMain(m *testing.M) {
 
 		log.Println("Cleaning up after tests")
 
-		if err := testStockDao.Close(); err != nil {
-			log.Printf("Error closing StockDao: %s", err)
-		}
+		testApp.Close()
 
-		if err := testPostgresContainer.Terminate(testContainerContext); err != nil {
+		if err := testContainerPostgres.Terminate(testContainerDatabaseContext); err != nil {
 			log.Printf("Error closing Test Postgres Container: %s", err)
 		}
 
@@ -111,7 +125,7 @@ func ClearTables() error {
 	var db *sql.DB
 	var err error
 
-	if db, err = sql.Open(testContainerDriverName, testContainerDataSourceName); err != nil {
+	if db, err = sql.Open(testContainerDatabaseDriverName, testContainerDataSourceName); err != nil {
 		return fmt.Errorf("Failed to connect to %q: %w", testContainerDataSourceName, err)
 	}
 

@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"net/http"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/gorilla/mux"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
@@ -15,7 +15,7 @@ import (
 
 type App struct {
 	config      *cfg.Config
-	mux         *http.ServeMux
+	mux         *mux.Router
 	topicRouter msg.TopicRouter
 	pool        *sql.DB
 	consumer    *kafka.Consumer
@@ -36,10 +36,10 @@ func Init(config *cfg.Config) (*App, error) {
 
 	db.MustRunMigrations(pool, config.Database())
 
-	log.Printf("--- Application Initialized ---")
+	
 	app := &App{
 		config:      config,
-		mux:         http.NewServeMux(),
+		mux:         mux.NewRouter(),
 		topicRouter: msg.TopicRouter{},
 		pool:        pool,
 		consumer:    consumer,
@@ -52,6 +52,7 @@ func Init(config *cfg.Config) (*App, error) {
 
 	msg.Start(app.consumer, app.producer, app.topicRouter)
 
+	log.Printf("--- Application Initialized ---")
 	return app, nil
 }
 
@@ -68,24 +69,15 @@ func (app *App) Close() {
 	}
 }
 
-func (app *App) Router() *http.ServeMux {
+func (app *App) Router() *mux.Router {
 	return app.mux
 }
 
 func (app *App) registerHealthEndpoint() {
-	healthHandler := MustHealthHandler(app.config)
+	healthHandler := MustHealthHandler(app.pool)
 
-	app.mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		var handle http.HandlerFunc
-		switch r.Method {
-		case http.MethodGet:
-			handle = healthHandler.CheckHealth
-		default:
-			http.Error(w, "method not found", http.StatusMethodNotAllowed)
-			return
-		}
-		handle(w, r)
-	})
+	app.mux.HandleFunc("/health", healthHandler.CheckHealth).
+		Methods("GET")
 }
 
 func (app *App) registerStockEndpoint() {
@@ -93,17 +85,9 @@ func (app *App) registerStockEndpoint() {
 	stockService := svc.MustStockService(stockDao)
 	stockHandler := NewStockHandler(stockService)
 
-	app.mux.HandleFunc("/kitchen/api/v1/stock", func(w http.ResponseWriter, r *http.Request) {
-		var handle http.HandlerFunc
-		switch r.Method {
-		case http.MethodGet:
-			handle = stockHandler.GetStock
-		default:
-			http.Error(w, "method not found", http.StatusMethodNotAllowed)
-			return
-		}
-		handle(w, r)
-	})
+	stock := app.mux.PathPrefix("/kitchen/api/v1/stock").Subrouter()
+	stock.HandleFunc("", stockHandler.GetStock).
+		Methods("GET")
 }
 
 func (app *App) registerOrderEndpoint() {

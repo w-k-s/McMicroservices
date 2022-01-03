@@ -27,6 +27,7 @@ func TestConfigTestSuite(t *testing.T) {
 var configFileContents string = `
 [server]
 port = 8080
+
 [database]
 username = "jack.torrence"
 password = "password"
@@ -34,6 +35,12 @@ name     = "overlook"
 host     = "localhost"
 port     = 5432
 sslmode  = "disable"
+
+[[broker]]
+bootstrap_servers = ["localhost"]
+
+[[broker.consumer]]
+group_id = "group_id"
 `
 
 func createTestConfigFile(content string, uri string) error {
@@ -82,6 +89,10 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_loadin
 	assert.Equal(suite.T(), 5432, config.Database().Port())
 	assert.Equal(suite.T(), "disable", config.Database().SslMode())
 	assert.Equal(suite.T(), "host=localhost port=5432 user=jack.torrence password=password dbname=overlook sslmode=disable", config.Database().ConnectionString())
+	assert.Equal(suite.T(), []string{"localhost"}, config.Broker().BootstrapServers())
+	assert.Equal(suite.T(), "group_id", config.Broker().ConsumerConfig().GroupId())
+	assert.Equal(suite.T(), "earliest", config.Broker().ConsumerConfig().AutoOffsetReset())
+	assert.Equal(suite.T(), "plaintext", config.Broker().SecurityProtocol())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_configFileDoesNotExistAtDefaultPath_THEN_errorIsReturned() {
@@ -100,7 +111,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_config
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileDoesNotExistAtProvidedPath_THEN_errorIsReturned() {
 	// GIVEN
-	uri := "file://" + filepath.Join("/.budget", "test.d", "config.toml")
+	uri := "file://" + filepath.Join("/.kitchen", "test.d", "config.toml")
 
 	// WHEN
 	config, err := LoadConfig(uri, "", "", "")
@@ -108,7 +119,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFil
 	// THEN
 	assert.NotNil(suite.T(), err)
 	assert.Nil(suite.T(), config)
-	assert.Equal(suite.T(), "failed to read config file from local path '/.budget/test.d/config.toml'. Reason: open /.budget/test.d/config.toml: no such file or directory", err.Error())
+	assert.Equal(suite.T(), "failed to read config file from local path '/.kitchen/test.d/config.toml'. Reason: open /.kitchen/test.d/config.toml: no such file or directory", err.Error())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileDoesExistAtProvidedPath_THEN_configsParsedCorrectly() {
@@ -119,6 +130,7 @@ port = 8085
 read_timeout = 5
 write_timeout = 3
 max_header_bytes = 2097152
+
 [database]
 username = "danny.torrence"
 password = "password"
@@ -126,6 +138,13 @@ name     = "tony"
 host     = "localhost"
 port     = 5432
 sslmode  = "disable"
+
+[[broker]]
+bootstrap_servers = ["localhost"]
+security_protocol = "ssl"
+
+[[broker.consumer]]
+group_id = "group_id"
 `
 	assert.Nil(suite.T(), createTestConfigFile(customConfigFileContents, DefaultConfigFilePath()))
 
@@ -147,7 +166,10 @@ sslmode  = "disable"
 	assert.Equal(suite.T(), 5432, config.Database().Port())
 	assert.Equal(suite.T(), "disable", config.Database().SslMode())
 	assert.Equal(suite.T(), "host=localhost port=5432 user=danny.torrence password=password dbname=tony sslmode=disable", config.Database().ConnectionString())
-
+	assert.Equal(suite.T(), []string{"localhost"}, config.Broker().BootstrapServers())
+	assert.Equal(suite.T(), "group_id", config.Broker().ConsumerConfig().GroupId())
+	assert.Equal(suite.T(), "earliest", config.Broker().ConsumerConfig().AutoOffsetReset())
+	assert.Equal(suite.T(), "ssl", config.Broker().SecurityProtocol())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileIsEmpty_THEN_errorIsReturned() {
@@ -168,6 +190,8 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFil
 	assert.Contains(suite.T(), err.Error(), "Database password is required")
 	assert.Contains(suite.T(), err.Error(), "Database port is required")
 	assert.Contains(suite.T(), err.Error(), "Database name is required")
+	assert.Contains(suite.T(), err.Error(), "servers list can not be empty")
+	assert.Contains(suite.T(), err.Error(), "Kafka Consumer GroupId is required")
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileDoesNotContainValidToml_THEN_errorIsReturned() {
@@ -190,7 +214,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFil
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotPrefixedWithFileOrS3Protocol_WHEN_configFileIsLoaded_THEN_errorIsReturned() {
 	// GIVEN
-	uri := "http://" + filepath.Join("/.budget", "test.d", "config.toml")
+	uri := "http://" + filepath.Join("/.kitchen", "test.d", "config.toml")
 
 	// WHEN
 	config, err := LoadConfig(uri, "", "", "")

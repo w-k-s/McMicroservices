@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/w-k-s/simple-budget-tracker/pkg/ledger"
+	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	"schneider.vip/problem"
 )
 
@@ -26,7 +26,7 @@ func (h Handler) DecodeJsonOrSendBadRequest(w http.ResponseWriter, req *http.Req
 	decoder := json.NewDecoder(req.Body)
 	decoder.UseNumber()
 	if err := decoder.Decode(v); err != nil {
-		h.MustEncodeProblem(w, req, ledger.NewError(ledger.ErrRequestUnmarshallingFailed, "Failed to parse request", err))
+		h.MustEncodeProblem(w, req, k.NewError(k.ErrUnmarshalling, "Failed to parse request", err))
 		return false
 	}
 	return true
@@ -36,13 +36,13 @@ func (h Handler) MustEncodeProblem(w http.ResponseWriter, req *http.Request, err
 
 	log.Printf("Error: %s", err.Error())
 
-	title := ledger.ErrUnknown.Name()
-	code := ledger.ErrUnknown
+	title := k.ErrUnknown.Name()
+	code := k.ErrUnknown
 	detail := err.Error()
 	opts := []problem.Option{}
-	status := ledger.ErrUnknown.Status()
+	status := k.ErrUnknown.Status()
 
-	if coreError, ok := err.(ledger.Error); ok {
+	if coreError, ok := err.(k.Error); ok {
 		title = coreError.Code().Name()
 		code = coreError.Code()
 		detail = coreError.Error()

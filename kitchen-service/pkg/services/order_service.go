@@ -38,7 +38,7 @@ type OrderResponse struct {
 }
 
 type OrderService interface {
-	ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error)
+	ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, k.Error)
 }
 
 type orderService struct {
@@ -55,21 +55,21 @@ func NewOrderService(stockDao db.StockDao) (OrderService, error) {
 	}, nil
 }
 
-func MustOrderService(stockDao db.StockDao) StockService {
+func MustOrderService(stockDao db.StockDao) OrderService {
 	var (
-		svc StockService
+		svc OrderService
 		err error
 	)
-	if svc, err = NewStockService(stockDao); err != nil {
+	if svc, err = NewOrderService(stockDao); err != nil {
 		log.Fatalf(err.Error())
 	}
 	return svc
 }
 
-func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error) {
+func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, k.Error) {
 	var (
 		tx  *sql.Tx
-		err error
+		err k.Error
 	)
 
 	log.Printf("Processing order %d: %q", req.OrderId, req.Toppings)

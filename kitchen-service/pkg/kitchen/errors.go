@@ -16,6 +16,8 @@ const (
 	ErrUnknown ErrorCode = iota + 1000
 	ErrDatabaseConnectivity
 	ErrDatabaseState
+	ErrUnmarshalling
+	ErrMarshalling
 
 	ErrInvalidStockItem
 
@@ -26,6 +28,8 @@ var errorCodeNames = map[ErrorCode]string{
 	ErrUnknown:              "UNKOWN",
 	ErrDatabaseConnectivity: "DATABASE_CONNECTIVITY",
 	ErrDatabaseState:        "DATABASE_STATE",
+	ErrUnmarshalling:        "UNMARSHALLING",
+	ErrMarshalling:          "MARSHALLING",
 	ErrInvalidStockItem:     "INVALID_STOCK_ITEM",
 	ErrInsufficientStock:    "INSUFFICIENT_STOCK",
 }
@@ -43,12 +47,16 @@ func (c ErrorCode) Status() int {
 	switch c {
 	case ErrInvalidStockItem:
 		fallthrough
+	case ErrUnmarshalling:
+		fallthrough
 	case ErrInsufficientStock:
 		return http.StatusBadRequest
 
 	case ErrDatabaseConnectivity:
 		fallthrough
 	case ErrDatabaseState:
+		fallthrough
+	case ErrMarshalling:
 		fallthrough
 	case ErrUnknown:
 		fallthrough
@@ -109,7 +117,7 @@ func NewErrorWithFields(code ErrorCode, message string, cause error, fields map[
 	}
 }
 
-func makeCoreValidationError(code ErrorCode, errors *validate.Errors) error {
+func makeCoreValidationError(code ErrorCode, errors *validate.Errors) Error {
 	if !errors.HasAny() {
 		return nil
 	}

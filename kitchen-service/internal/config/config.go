@@ -96,6 +96,7 @@ func readToml(bytes []byte) (*Config, error) {
 		}
 		Broker struct {
 			BootrstrapServers []string `toml:"bootstrap_servers"`
+			SecurityProtocol  string `toml:"security_protocol"`
 			Consumer          struct {
 				GroupId         string `toml:"group_id"`
 				AutoOffsetReset string `toml:"auto_offset_reset"`
@@ -119,6 +120,7 @@ func readToml(bytes []byte) (*Config, error) {
 		},
 		BrokerConfig{
 			boostrapServers: mutableConfig.Broker.BootrstrapServers,
+			securityProtocol: mutableConfig.Broker.SecurityProtocol,
 			consumerConfig: NewConsumerConfig(
 				mutableConfig.Broker.Consumer.GroupId,
 				mutableConfig.Broker.Consumer.AutoOffsetReset,

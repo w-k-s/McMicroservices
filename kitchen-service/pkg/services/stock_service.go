@@ -20,8 +20,18 @@ type StockResponse struct {
 	Stock []StockItemResponse `json:"stock"`
 }
 
+type StockItemRequest struct {
+	Name  string `json:"name"`
+	Units uint   `json:"units"`
+}
+
+type StockRequest struct {
+	Stock []StockItemRequest `json:"stock"`
+}
+
 type StockService interface {
-	GetStock(ctx context.Context) (StockResponse, error)
+	GetStock(ctx context.Context) (StockResponse, k.Error)
+	ReceiveInventory(ctx context.Context, req StockRequest) k.Error
 }
 
 type stockService struct {
@@ -49,11 +59,11 @@ func MustStockService(stockDao db.StockDao) StockService {
 	return svc
 }
 
-func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
+func (svc stockService) GetStock(ctx context.Context) (StockResponse, k.Error) {
 	var (
 		stock k.Stock
 		tx    *sql.Tx
-		err   error
+		err   k.Error
 	)
 
 	tx, err = svc.stockDao.BeginTx()
@@ -79,4 +89,38 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 	}
 
 	return StockResponse{items}, nil
+}
+
+func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) k.Error {
+	var (
+		tx  *sql.Tx
+		err k.Error
+	)
+
+	tx, err = svc.stockDao.BeginTx()
+	if err != nil {
+		return err
+	}
+
+	defer db.DeferRollback(tx, "ReceiveInventory")
+
+	received := k.Stock{}
+	for _, requestItem := range req.Stock {
+		var stockItem k.StockItem
+		if stockItem, err = k.NewStockItem(requestItem.Name, requestItem.Units); err != nil {
+			return err
+		}
+		received = append(received, stockItem)
+	}
+
+	err = svc.stockDao.Increase(ctx, tx, received)
+	if err != nil {
+		return err
+	}
+
+	if err = db.Commit(tx); err != nil {
+		return err
+	}
+
+	return nil
 }

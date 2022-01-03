@@ -1,8 +1,12 @@
 package messages
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"log"
+	"reflect"
 	"strings"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -13,9 +17,13 @@ type (
 	RequestBody   []byte
 	ResponseBody  []byte
 	ResponseTopic string
-	TopicHandler  func(request RequestBody) (ResponseTopic, ResponseBody)
+	TopicHandler  func(ctx context.Context, request RequestBody) (ResponseTopic, ResponseBody)
 	TopicRouter   map[string]TopicHandler
 )
+
+func (rb RequestBody) Reader() io.Reader {
+	return bytes.NewReader([]byte(rb))
+}
 
 func (rt ResponseTopic) StringPointer() *string {
 	s := string(rt)
@@ -31,8 +39,15 @@ func (tr TopicRouter) Topics() []string {
 }
 
 func NewConsumerProducerPair(brokerConfig cfg.BrokerConfig) (*kafka.Consumer, *kafka.Producer, error) {
+	log.Printf("boostrap.servers: %q, security.protocol: %q, group.id: %q, auto.offset.reset: %q\n", 
+	strings.Join(brokerConfig.BootstrapServers(), ","),
+	brokerConfig.SecurityProtocol(),
+	brokerConfig.ConsumerConfig().GroupId(),
+	brokerConfig.ConsumerConfig().AutoOffsetReset(),
+)
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": strings.Join(brokerConfig.BootstrapServers(), ","),
+		"security.protocol": brokerConfig.SecurityProtocol(),
 		"group.id":          brokerConfig.ConsumerConfig().GroupId(),
 		"auto.offset.reset": brokerConfig.ConsumerConfig().AutoOffsetReset(),
 	})
@@ -99,8 +114,12 @@ func startReadingMessages(
 
 		for {
 			msg, err := consumer.ReadMessage(-1)
-			if err != nil {
-				log.Printf("Consumer error: %v (%v)\n", err, msg)
+			switch e := err.(type){
+			case kafka.Error: 
+				log.Printf("Kafka Error: %v\n", e)
+				continue
+			default: 
+				log.Printf("Consumer error (kind: %s): %v (%v)\n", reflect.TypeOf(err), err, msg)
 			}
 
 			log.Printf("Message on %q: %s\n", msg.TopicPartition, string(msg.Value))
@@ -110,14 +129,16 @@ func startReadingMessages(
 				continue
 			}
 
-			topic, resp := handler(msg.Value)
-			err = producer.Produce(&kafka.Message{
-				TopicPartition: kafka.TopicPartition{Topic: topic.StringPointer(), Partition: kafka.PartitionAny},
-				Value:          resp,
-			}, nil)
+			topic, resp := handler(context.Background(), msg.Value)
+			if topic != "" && len(resp) > 0 {
+				err = producer.Produce(&kafka.Message{
+					TopicPartition: kafka.TopicPartition{Topic: topic.StringPointer(), Partition: kafka.PartitionAny},
+					Value:          resp,
+				}, nil)
 
-			if err != nil {
-				log.Printf("Unable to produce message. Reason: %q", err)
+				if err != nil {
+					log.Printf("Unable to produce message. Reason: %q", err)
+				}
 			}
 		}
 	}()

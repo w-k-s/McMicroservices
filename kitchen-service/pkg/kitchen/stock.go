@@ -17,7 +17,7 @@ type StockItemRecord interface {
 	Units() uint
 }
 
-func NewStockItem(name string, units uint) (StockItem, error) {
+func NewStockItem(name string, units uint) (StockItem, Error) {
 
 	errors := validate.Validate(
 		&validators.StringLengthInRange{Name: "Name", Field: name, Min: 1, Max: 25, Message: "Name must be 1 and 25 characters long"},

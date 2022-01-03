@@ -7,24 +7,23 @@ import (
 	"log"
 	"net/http"
 
-	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 )
 
 type healthHandler struct {
 	Handler
-	config *cfg.Config
+	db *sql.DB
 }
 
-func NewHealthHandler(config *cfg.Config) (healthHandler, error) {
-	if config == nil {
-		return healthHandler{}, fmt.Errorf("healthHandler received config: nil. non-nil config expected")
+func NewHealthHandler(db *sql.DB) (healthHandler, error) {
+	if db == nil {
+		return healthHandler{}, fmt.Errorf("healthHandler received db: nil. non-nil db expected")
 	}
-	return healthHandler{Handler{}, config}, nil
+	return healthHandler{Handler{}, db}, nil
 }
 
-func MustHealthHandler(config *cfg.Config) healthHandler {
-	handler, err := NewHealthHandler(config)
+func MustHealthHandler(db *sql.DB) healthHandler {
+	handler, err := NewHealthHandler(db)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -45,14 +44,6 @@ func (h healthHandler) databaseStatusReport() status {
 		err error
 	)
 
-	if db, err = sql.Open(
-		h.config.Database().DriverName(),
-		h.config.Database().ConnectionString()); err != nil {
-		log.Printf("Failed to connect to database for health check. Reason: %s", err)
-		return down
-	}
-
-	db.SetMaxIdleConns(0) // Required, otherwise pinging will result in EOF
 	if err = dao.PingWithBackOff(db); err != nil {
 		log.Printf("Ping failed for health check. Reason: %s", err)
 		return down

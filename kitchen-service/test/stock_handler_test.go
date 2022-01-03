@@ -49,7 +49,7 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 	assert.Nil(suite.T(), increaseTx.Commit(), "Commit returned error")
 
 	// WHEN
-	r, _ := http.NewRequest("GET", "kitchen/api/v1/stock", nil)
+	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
 	w := httptest.NewRecorder()
 	testApp.Router().ServeHTTP(w, r)
 
@@ -59,7 +59,7 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 	assert.Nil(suite.T(), json.Unmarshal(w.Body.Bytes(), &stockResponse))
 	assert.Equal(suite.T(), 200, w.Code)
 	assert.Equal(suite.T(), "Cheese", stockResponse.Stock[0].Name)
-	assert.Equal(suite.T(), 5, stockResponse.Stock[0].Units)
-	assert.Equal(suite.T(), "Donuts", stockResponse.Stock[0].Name)
-	assert.Equal(suite.T(), 7, stockResponse.Stock[0].Units)
+	assert.Equal(suite.T(), uint(5), stockResponse.Stock[0].Units)
+	assert.Equal(suite.T(), "Donuts", stockResponse.Stock[1].Name)
+	assert.Equal(suite.T(), uint(7), stockResponse.Stock[1].Units)
 }
