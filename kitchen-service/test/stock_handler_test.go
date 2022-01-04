@@ -1,16 +1,16 @@
 package test
 
 import (
-	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
+	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
@@ -39,14 +39,16 @@ func (suite *StockHandlerTestSuite) TearDownTest() {
 // -- SUITE
 
 func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
-	// GIVEN
-	ctx := context.Background()
-	increaseTx := suite.stockDao.MustBeginTx()
 
-	item1, _ := k.NewStockItem("Cheese", 5)
-	item2, _ := k.NewStockItem("Donuts", 7)
-	assert.Nil(suite.T(), suite.stockDao.Increase(ctx, increaseTx, k.Stock{item1, item2}), "Increase returned error")
-	assert.Nil(suite.T(), increaseTx.Commit(), "Commit returned error")
+	NewKafkaSender(testKafkaProducer).
+		MustSendAsJSON(app.InventoryDelivery, svc.StockRequest{
+			Stock: []svc.StockItemRequest{
+				{Name: "Cheese", Units: uint(5)},
+				{Name: "Donuts", Units: uint(7)},
+			},
+		})
+
+	time.Sleep(time.Duration(25) * time.Second)
 
 	// WHEN
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
@@ -58,6 +60,7 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 
 	assert.Nil(suite.T(), json.Unmarshal(w.Body.Bytes(), &stockResponse))
 	assert.Equal(suite.T(), 200, w.Code)
+	assert.Equal(suite.T(), 2, len(stockResponse.Stock))
 	assert.Equal(suite.T(), "Cheese", stockResponse.Stock[0].Name)
 	assert.Equal(suite.T(), uint(5), stockResponse.Stock[0].Units)
 	assert.Equal(suite.T(), "Donuts", stockResponse.Stock[1].Name)

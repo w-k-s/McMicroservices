@@ -39,12 +39,12 @@ func (tr TopicRouter) Topics() []string {
 }
 
 func NewConsumerProducerPair(brokerConfig cfg.BrokerConfig) (*kafka.Consumer, *kafka.Producer, error) {
-	log.Printf("boostrap.servers: %q, security.protocol: %q, group.id: %q, auto.offset.reset: %q\n", 
-	strings.Join(brokerConfig.BootstrapServers(), ","),
-	brokerConfig.SecurityProtocol(),
-	brokerConfig.ConsumerConfig().GroupId(),
-	brokerConfig.ConsumerConfig().AutoOffsetReset(),
-)
+	log.Printf("boostrap.servers: %q, security.protocol: %q, group.id: %q, auto.offset.reset: %q\n",
+		strings.Join(brokerConfig.BootstrapServers(), ","),
+		brokerConfig.SecurityProtocol(),
+		brokerConfig.ConsumerConfig().GroupId(),
+		brokerConfig.ConsumerConfig().AutoOffsetReset(),
+	)
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": strings.Join(brokerConfig.BootstrapServers(), ","),
 		"security.protocol": brokerConfig.SecurityProtocol(),
@@ -81,6 +81,7 @@ func Start(
 	producer *kafka.Producer,
 	router TopicRouter,
 ) {
+	log.Printf("Consumer is subscribed to topics %q\n", router.Topics())
 	consumer.SubscribeTopics(router.Topics(), nil)
 	startLoggingDelivery(producer)
 	startReadingMessages(consumer, producer, router)
@@ -94,7 +95,7 @@ func startLoggingDelivery(producer *kafka.Producer) {
 				if ev.TopicPartition.Error != nil {
 					log.Printf("Delivery failed: %v\n", ev.TopicPartition)
 				} else {
-					log.Printf("Delivered message to %v\n", ev.TopicPartition)
+					log.Printf("Delivered message to %q: %q\n", ev.TopicPartition, string(ev.Value))
 				}
 			}
 		}
@@ -113,13 +114,17 @@ func startReadingMessages(
 		)
 
 		for {
+			log.Println("Waiting for messages...")
 			msg, err := consumer.ReadMessage(-1)
-			switch e := err.(type){
-			case kafka.Error: 
-				log.Printf("Kafka Error: %v\n", e)
-				continue
-			default: 
-				log.Printf("Consumer error (kind: %s): %v (%v)\n", reflect.TypeOf(err), err, msg)
+			if err != nil {
+				switch e := err.(type) {
+				case kafka.Error:
+					log.Printf("Kafka Error: %v\n", e)
+					continue
+				default:
+					log.Printf("Consumer error (kind: %s): %v (%v)\n", reflect.TypeOf(err), err, msg)
+					continue
+				}
 			}
 
 			log.Printf("Message on %q: %s\n", msg.TopicPartition, string(msg.Value))

@@ -8,9 +8,11 @@ import (
 	"os"
 	"testing"
 
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
+	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
@@ -29,6 +31,8 @@ var (
 	testContainerDataSourceName  string
 	testDB                       *sql.DB
 	testKafkaCluster             *KafkaCluster
+	testKafkaConsumer            *kafka.Consumer
+	testKafkaProducer            *kafka.Producer
 	testStockDao                 dao.StockDao
 	testConfig                   *cfg.Config
 	testApp                      *app.App
@@ -48,6 +52,8 @@ func init() {
 
 	testDB = db.MustOpenPool(testConfig.Database())
 	db.MustRunMigrations(testDB, testConfig.Database())
+
+	testKafkaConsumer, testKafkaProducer = msg.MustNewConsumerProducerPair(testConfig.Broker())
 
 	testStockDao = db.MustOpenStockDao(testDB)
 
@@ -94,7 +100,7 @@ func requestDatabaseTestContainer() cfg.DBConfig {
 func requestKafkaTestContainer() cfg.BrokerConfig {
 	testKafkaCluster = NewKafkaCluster()
 	testKafkaCluster.StartCluster()
-	
+
 	log.Printf("\nBoostrap Servers: %s\n", testKafkaCluster.GetKafkaHost())
 
 	return cfg.NewBrokerConfig(

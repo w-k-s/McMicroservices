@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
@@ -45,7 +46,7 @@ func (s stockHandler) GetStock(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s stockHandler) ReceiveInventory(ctx context.Context, request msg.RequestBody) (msg.ResponseTopic, msg.ResponseBody) {
-
+	log.Println("Inventory Received...")
 	decoder := json.NewDecoder(request.Reader())
 	decoder.UseNumber()
 
@@ -54,7 +55,7 @@ func (s stockHandler) ReceiveInventory(ctx context.Context, request msg.RequestB
 		err                     error
 		kitchenError            k.Error
 	)
-	if err = decoder.Decode(receiveInventoryRequest); err != nil {
+	if err = decoder.Decode(&receiveInventoryRequest); err != nil {
 		return InventoryRejected, problem.New(
 			problem.Type(fmt.Sprintf("/api/v1/problems/%d", k.ErrUnmarshalling)),
 			problem.Status(k.ErrUnmarshalling.Status()),

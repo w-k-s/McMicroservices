@@ -36,7 +36,6 @@ func Init(config *cfg.Config) (*App, error) {
 
 	db.MustRunMigrations(pool, config.Database())
 
-	
 	app := &App{
 		config:      config,
 		mux:         mux.NewRouter(),
@@ -88,6 +87,8 @@ func (app *App) registerStockEndpoint() {
 	stock := app.mux.PathPrefix("/kitchen/api/v1/stock").Subrouter()
 	stock.HandleFunc("", stockHandler.GetStock).
 		Methods("GET")
+
+	app.topicRouter[InventoryDelivery] = stockHandler.ReceiveInventory
 }
 
 func (app *App) registerOrderEndpoint() {

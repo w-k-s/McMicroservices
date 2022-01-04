@@ -1,10 +1,10 @@
 package config
 
 type BrokerConfig struct {
-	boostrapServers []string
+	boostrapServers  []string
 	securityProtocol string
-	consumerConfig  consumerConfig
-	producerConfig  producerConfig
+	consumerConfig   consumerConfig
+	producerConfig   producerConfig
 }
 
 func (bc BrokerConfig) BootstrapServers() []string {
@@ -12,7 +12,7 @@ func (bc BrokerConfig) BootstrapServers() []string {
 }
 
 func (bc BrokerConfig) SecurityProtocol() string {
-	if bc.securityProtocol == ""{
+	if bc.securityProtocol == "" {
 		return "plaintext"
 	}
 	return bc.securityProtocol
@@ -32,10 +32,10 @@ func NewBrokerConfig(
 	consumerConfig consumerConfig,
 ) BrokerConfig {
 	return BrokerConfig{
-		boostrapServers: boostrapServers,
+		boostrapServers:  boostrapServers,
 		securityProtocol: securityProtocol,
-		consumerConfig:  consumerConfig,
-		producerConfig:  NewProducerConfig(),
+		consumerConfig:   consumerConfig,
+		producerConfig:   NewProducerConfig(),
 	}
 }
 
