@@ -15,7 +15,6 @@ import (
 	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
-	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 )
 
 const (
@@ -33,7 +32,6 @@ var (
 	testKafkaCluster             *KafkaCluster
 	testKafkaConsumer            *kafka.Consumer
 	testKafkaProducer            *kafka.Producer
-	testStockDao                 dao.StockDao
 	testConfig                   *cfg.Config
 	testApp                      *app.App
 	err                          error
@@ -51,11 +49,7 @@ func init() {
 	}
 
 	testDB = db.MustOpenPool(testConfig.Database())
-	db.MustRunMigrations(testDB, testConfig.Database())
-
 	testKafkaConsumer, testKafkaProducer = msg.MustNewConsumerProducerPair(testConfig.Broker())
-
-	testStockDao = db.MustOpenStockDao(testDB)
 
 	if testApp, err = app.Init(testConfig); err != nil {
 		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)

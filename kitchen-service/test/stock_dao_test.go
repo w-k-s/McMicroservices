@@ -9,6 +9,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 )
@@ -25,7 +26,7 @@ func TestStockDaoTestSuite(t *testing.T) {
 // -- SETUP
 
 func (suite *StockDaoTestSuite) SetupTest() {
-	suite.stockDao = testStockDao
+	suite.stockDao = db.MustOpenStockDao(testDB)
 }
 
 // -- TEARDOWN
@@ -142,7 +143,6 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvai
 	// THEN
 	assert.NotNil(suite.T(), err)
 
-	kitchenError := err.(k.Error)
-	assert.Equal(suite.T(), k.ErrInsufficientStock, kitchenError.Code())
-	assert.Equal(suite.T(), "Insufficient stock of \"Cheese\"", kitchenError.Error())
+	assert.Equal(suite.T(), k.ErrInsufficientStock, err.Code())
+	assert.Equal(suite.T(), "Insufficient stock of \"Cheese\"", err.Error())
 }
