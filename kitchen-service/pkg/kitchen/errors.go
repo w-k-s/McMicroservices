@@ -13,7 +13,7 @@ import (
 type ErrorCode uint64
 
 const (
-	ErrUnknown ErrorCode = iota + 1000
+	ErrUnknown ErrorCode = iota + 2000
 	ErrDatabaseConnectivity
 	ErrDatabaseState
 	ErrUnmarshalling

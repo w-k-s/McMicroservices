@@ -11,13 +11,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
-	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
 type StockHandlerTestSuite struct {
 	suite.Suite
-	stockDao dao.StockDao
 }
 
 func TestStockHandlerTestSuite(t *testing.T) {
@@ -27,19 +25,17 @@ func TestStockHandlerTestSuite(t *testing.T) {
 // -- SETUP
 
 func (suite *StockHandlerTestSuite) SetupTest() {
-	suite.stockDao = testStockDao
 }
 
 func (suite *StockHandlerTestSuite) TearDownTest() {
 	if err := ClearTables(); err != nil {
-		log.Fatalf("Failed to tear down AccountHandlerTestSuite: %s", err)
+		log.Fatalf("Failed to tear down StockHandlerTestSuite: %s", err)
 	}
 }
 
 // -- SUITE
 
 func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
-
 	NewKafkaSender(testKafkaProducer).
 		MustSendAsJSON(app.InventoryDelivery, svc.StockRequest{
 			Stock: []svc.StockItemRequest{
@@ -48,7 +44,7 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 			},
 		})
 
-	time.Sleep(time.Duration(25) * time.Second)
+	time.Sleep(time.Duration(20) * time.Second)
 
 	// WHEN
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)

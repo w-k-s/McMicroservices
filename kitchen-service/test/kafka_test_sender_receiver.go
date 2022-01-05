@@ -53,17 +53,17 @@ func NewKafkaReceiver(consumer *kafka.Consumer) KafkaReceiver {
 }
 
 func (kr KafkaReceiver) Close() {
+	log.Printf("Closing KafkaReceiver")
 	kr.cancelFunc()
 }
 
-func (kr KafkaReceiver) Listen(ctx context.Context) {
+func (kr KafkaReceiver) Listen() {
 	go func() {
 		run := true
 		for run {
 			select {
-			case <-ctx.Done():
+			case <-kr.ctx.Done():
 				run = false
-				log.Printf("KafkaReceiver cancelled")
 			default:
 				kr.handleMessage()
 			}

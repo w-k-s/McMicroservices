@@ -48,7 +48,7 @@ func (oh orderHandler) HandleOrderMessage(ctx context.Context, request msg.Reque
 		err           error
 		kitchenError  k.Error
 	)
-	if err = decoder.Decode(orderRequest); err != nil {
+	if err = decoder.Decode(&orderRequest); err != nil {
 		return OrderFailed, problem.New(
 			problem.Type(fmt.Sprintf("/api/v1/problems/%d", k.ErrUnmarshalling)),
 			problem.Status(k.ErrUnmarshalling.Status()),

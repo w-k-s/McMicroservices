@@ -85,7 +85,7 @@ func PingWithBackOff(db *sql.DB) error {
 		RandomizationFactor: backoff.DefaultRandomizationFactor,
 		Multiplier:          backoff.DefaultMultiplier,
 		MaxInterval:         time.Duration(100) * time.Millisecond,
-		MaxElapsedTime:      time.Duration(1000) * time.Millisecond,
+		MaxElapsedTime:      time.Duration(5) * time.Second,
 		Clock:               backoff.SystemClock,
 	}
 	exponentialBackoff.Reset()

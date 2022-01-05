@@ -136,6 +136,7 @@ func startReadingMessages(
 
 			topic, resp := handler(context.Background(), msg.Value)
 			if topic != "" && len(resp) > 0 {
+				log.Printf("Sending message %q on topic %q", string([]byte(resp)), topic)
 				err = producer.Produce(&kafka.Message{
 					TopicPartition: kafka.TopicPartition{Topic: topic.StringPointer(), Partition: kafka.PartitionAny},
 					Value:          resp,

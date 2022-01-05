@@ -19,13 +19,13 @@ func TestErrorTestSuite(t *testing.T) {
 // -- SUITE
 
 func (suite *ErrorTestSuite) Test_GIVEN_errorCode_WHEN_mappedToNumber_THEN_mappingIsCorrect() {
-	assert.Equal(suite.T(), uint64(1000), uint64(ErrUnknown))
-	assert.Equal(suite.T(), uint64(1001), uint64(ErrDatabaseConnectivity))
-	assert.Equal(suite.T(), uint64(1002), uint64(ErrDatabaseState))
-	assert.Equal(suite.T(), uint64(1003), uint64(ErrUnmarshalling))
-	assert.Equal(suite.T(), uint64(1004), uint64(ErrMarshalling))
-	assert.Equal(suite.T(), uint64(1005), uint64(ErrInvalidStockItem))
-	assert.Equal(suite.T(), uint64(1006), uint64(ErrInsufficientStock))
+	assert.Equal(suite.T(), uint64(2000), uint64(ErrUnknown))
+	assert.Equal(suite.T(), uint64(2001), uint64(ErrDatabaseConnectivity))
+	assert.Equal(suite.T(), uint64(2002), uint64(ErrDatabaseState))
+	assert.Equal(suite.T(), uint64(2003), uint64(ErrUnmarshalling))
+	assert.Equal(suite.T(), uint64(2004), uint64(ErrMarshalling))
+	assert.Equal(suite.T(), uint64(2005), uint64(ErrInvalidStockItem))
+	assert.Equal(suite.T(), uint64(2006), uint64(ErrInsufficientStock))
 }
 
 func (suite *ErrorTestSuite) Test_GIVEN_errorCode_WHEN_mappedToHttpStatus_THEN_mappingIsCorrect() {
