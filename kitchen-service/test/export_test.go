@@ -106,6 +106,11 @@ func requestKafkaTestContainer() cfg.BrokerConfig {
 
 func TestMain(m *testing.M) {
 	defer func(exitCode int) {
+		defer func(){
+			if r := recover(); r != nil{
+				log.Printf("Panic while cleaning tests. Reason: %v\n", r)
+			}
+		}()
 
 		log.Println("Cleaning up after tests")
 

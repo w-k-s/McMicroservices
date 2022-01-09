@@ -14,7 +14,7 @@ import (
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
-const messageWaitTimeout = time.Duration(120) * time.Second
+const messageWaitTimeout = time.Duration(5) * time.Minute
 
 type OrderHandlerTestSuite struct {
 	suite.Suite
@@ -30,6 +30,7 @@ func TestOrderStockHandlerTestSuite(t *testing.T) {
 func (suite *OrderHandlerTestSuite) SetupTest() {
 	testKafkaConsumer.SubscribeTopics([]string{
 		app.CreateOrder,
+		app.InventoryDelivery,
 		string(app.OrderReady),
 		string(app.OrderFailed),
 	}, nil)
