@@ -56,8 +56,8 @@ func Init(config *cfg.Config) (*App, error) {
 }
 
 func (app *App) Close() {
-	defer func(){
-		if r := recover(); r != nil{
+	defer func() {
+		if r := recover(); r != nil {
 			log.Printf("Failed to close application. Reason: %v\n", r)
 		}
 	}()

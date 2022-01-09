@@ -122,7 +122,7 @@ func TestMain(m *testing.M) {
 }
 
 func clearTables() {
-	if _, err := testDB.Exec("DELETE FROM kitchen.stock"); err != nil{
+	if _, err := testDB.Exec("DELETE FROM kitchen.stock"); err != nil {
 		log.Print("Failed to delete stock table: %w", err)
 	}
 }

@@ -46,10 +46,10 @@ func (oh orderHandler) HandleOrderMessage(ctx context.Context, request msg.Reque
 	if err = decoder.Decode(&orderRequest); err != nil {
 		// TODO: This should probably go in to a failed-to-process queue
 		log.Printf("Failed to decode order request. Reason: %s", err)
-		return "",[]byte{}
+		return "", []byte{}
 	}
 
-	if orderResponse, err = oh.orderService.ProcessOrder(ctx, orderRequest); err != nil{
+	if orderResponse, err = oh.orderService.ProcessOrder(ctx, orderRequest); err != nil {
 		return OrderFailed, oh.MustMarshal(json.Marshal(orderResponse))
 	}
 	return OrderReady, oh.MustMarshal(json.Marshal(orderResponse))

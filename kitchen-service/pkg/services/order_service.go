@@ -26,13 +26,13 @@ func (req OrderRequest) PreparationTime() time.Duration {
 
 // TODO: Should be separate events (probs with an event wrapper). Will do later.
 type OrderResponse struct {
-	OrderId uint64      `json:"id"`
-	Status  k.OrderStatus `json:"status"`
-	FailureReason string `json:"reason,omitempty"`
+	OrderId       uint64        `json:"id"`
+	Status        k.OrderStatus `json:"status"`
+	FailureReason string        `json:"reason,omitempty"`
 }
 
 type OrderService interface {
-	ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse,error)
+	ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error)
 }
 
 type orderService struct {
@@ -63,7 +63,7 @@ func MustOrderService(stockDao db.StockDao) OrderService {
 // I'm not happy with the return type.
 // The OrderResponse should be sent to a different topic depending upon whether error is nil or not. Can we improve this?
 // Can we return different event types and switch between topic based on the type of the event?
-func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse,error) {
+func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error) {
 	var (
 		tx  *sql.Tx
 		err k.Error

@@ -14,7 +14,7 @@ import (
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
-const messageWaitTimeout = time.Duration(90) * time.Second
+const messageWaitTimeout = time.Duration(120) * time.Second
 
 type OrderHandlerTestSuite struct {
 	suite.Suite
@@ -47,11 +47,13 @@ func (suite *OrderHandlerTestSuite) TearDownTest() {
 
 // This method ensures tests are run sequentially (i.e. not in parallel). Running tests in parallel causes flakiness.
 func (suite *OrderHandlerTestSuite) Test_orderProcessingSequentially() {
-    
-    suite.T().Run("", func(t *testing.T) { suite.GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully() })
+
+	suite.T().Run("", func(t *testing.T) {
+		suite.GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully()
+	})
 	clearTables()
-	
-    suite.T().Run("", func(t *testing.T) { suite.GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected() })
+
+	suite.T().Run("", func(t *testing.T) { suite.GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected() })
 }
 
 func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully() {
@@ -70,7 +72,8 @@ func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_T
 		},
 	})
 
-	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, app.InventoryDelivery).Plus(time.Second)
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, app.InventoryDelivery).
+		Plus(time.Second)
 
 	// WHEN
 	orderId := uint64(time.Now().Unix())
@@ -83,7 +86,8 @@ func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_T
 		},
 	})
 
-	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderReady)).Plus(time.Second)
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderReady)).
+		Plus(time.Second)
 
 	// THEN -- order prepared
 	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
@@ -131,7 +135,8 @@ func (suite *OrderHandlerTestSuite) GIVEN_insufficientStock_WHEN_orderIsReceived
 		},
 	})
 
-	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderFailed)).Plus(time.Second)
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderFailed)).
+		Plus(time.Second)
 
 	// THEN
 	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
@@ -141,6 +146,6 @@ func (suite *OrderHandlerTestSuite) GIVEN_insufficientStock_WHEN_orderIsReceived
 		"reason":"Insufficient stock of \"Tomatoes\"",
 		"id":%d,
 		"status":"FAILED"
-	}`,orderId), message)
+	}`, orderId), message)
 	log.Println("-------------------")
 }
