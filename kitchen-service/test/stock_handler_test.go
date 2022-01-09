@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -49,13 +48,14 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 	testApp.Router().ServeHTTP(w, r)
 
 	// THEN
-	var stockResponse svc.StockResponse
-
-	assert.Nil(suite.T(), json.Unmarshal(w.Body.Bytes(), &stockResponse))
 	assert.Equal(suite.T(), 200, w.Code)
-	assert.Equal(suite.T(), 2, len(stockResponse.Stock))
-	assert.Equal(suite.T(), "Cheese", stockResponse.Stock[0].Name)
-	assert.Equal(suite.T(), uint(5), stockResponse.Stock[0].Units)
-	assert.Equal(suite.T(), "Donuts", stockResponse.Stock[1].Name)
-	assert.Equal(suite.T(), uint(7), stockResponse.Stock[1].Units)
+	assert.JSONEq(suite.T(), `{
+		"stock": [{
+			"name": "Cheese",
+			"units": 5
+		}, {
+			"name": "Donuts",
+			"units": 7
+		}]
+	}`, w.Body.String())
 }
