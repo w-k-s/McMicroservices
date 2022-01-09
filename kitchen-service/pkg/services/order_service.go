@@ -16,14 +16,6 @@ type OrderRequest struct {
 	Toppings []string `json:"toppings"`
 }
 
-type OrderStatus string
-
-const (
-	OrderStatusPreparing OrderStatus = "PREPARING"
-	OrderStatusReady     OrderStatus = "READY"
-	OrderStatusFailed    OrderStatus = "FAILED"
-)
-
 func (req OrderRequest) PreparationTime() time.Duration {
 	sum := 0
 	for _, topping := range req.Toppings {
@@ -32,13 +24,15 @@ func (req OrderRequest) PreparationTime() time.Duration {
 	return time.Duration(sum) * time.Second
 }
 
+// TODO: Should be separate events (probs with an event wrapper). Will do later.
 type OrderResponse struct {
 	OrderId uint64      `json:"id"`
-	Status  OrderStatus `json:"status"`
+	Status  k.OrderStatus `json:"status"`
+	FailureReason string `json:"reason,omitempty"`
 }
 
 type OrderService interface {
-	ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, k.Error)
+	ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse,error)
 }
 
 type orderService struct {
@@ -66,7 +60,10 @@ func MustOrderService(stockDao db.StockDao) OrderService {
 	return svc
 }
 
-func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, k.Error) {
+// I'm not happy with the return type.
+// The OrderResponse should be sent to a different topic depending upon whether error is nil or not. Can we improve this?
+// Can we return different event types and switch between topic based on the type of the event?
+func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse,error) {
 	var (
 		tx  *sql.Tx
 		err k.Error
@@ -76,7 +73,7 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 
 	tx, err = svc.stockDao.BeginTx()
 	if err != nil {
-		return OrderResponse{}, err
+		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 	}
 
 	defer db.DeferRollback(tx, "ProcessOrder")
@@ -89,7 +86,7 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 
 	for _, topping := range req.Toppings {
 		if item, err = k.NewStockItem(topping, 1); err != nil {
-			return OrderResponse{req.OrderId, OrderStatusFailed}, err
+			return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 		}
 		stock = append(stock, item)
 	}
@@ -97,16 +94,17 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 	err = svc.stockDao.Decrease(ctx, tx, stock)
 	if err != nil {
 		log.Printf("Error processing order %d. Reason: %q", req.OrderId, err.Error())
-		return OrderResponse{req.OrderId, OrderStatusFailed}, err
+		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 	}
 
 	if err = db.Commit(tx); err != nil {
-		return OrderResponse{req.OrderId, OrderStatusFailed}, err
+		log.Printf("Error committing stock for order %d. Reason: %q", req.OrderId, err.Error())
+		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 	}
 
 	// Wait
 	log.Printf("Preparing order %d. PreparationTime: %q", req.OrderId, req.PreparationTime().String())
 	time.Sleep(req.PreparationTime())
 
-	return OrderResponse{req.OrderId, OrderStatusReady}, nil
+	return OrderResponse{req.OrderId, k.OrderStatusReady, ""}, nil
 }

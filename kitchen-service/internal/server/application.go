@@ -56,7 +56,14 @@ func Init(config *cfg.Config) (*App, error) {
 }
 
 func (app *App) Close() {
+	defer func(){
+		if r := recover(); r != nil{
+			log.Printf("Failed to close application. Reason: %v\n", r)
+		}
+	}()
 	var err error
+
+	// TODO: Closing Kafka causes usually causes panics in tests. Why?
 	app.producer.Flush(15 * 1000)
 	app.producer.Close()
 	if err = app.consumer.Close(); err != nil {

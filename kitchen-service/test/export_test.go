@@ -121,17 +121,8 @@ func TestMain(m *testing.M) {
 	}(m.Run())
 }
 
-func ClearTables() error {
-	var db *sql.DB
-	var err error
-
-	if db, err = sql.Open(testContainerDatabaseDriverName, testContainerDataSourceName); err != nil {
-		return fmt.Errorf("Failed to connect to %q: %w", testContainerDataSourceName, err)
+func clearTables() {
+	if _, err := testDB.Exec("DELETE FROM kitchen.stock"); err != nil{
+		log.Print("Failed to delete stock table: %w", err)
 	}
-
-	if _, err = db.Exec("DELETE FROM kitchen.stock"); err != nil {
-		return fmt.Errorf("Failed to delete stock table: %w", err)
-	}
-
-	return nil
 }

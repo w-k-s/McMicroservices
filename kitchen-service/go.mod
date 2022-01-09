@@ -49,7 +49,7 @@ require (
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	go.opencensus.io v0.22.4 // indirect
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sys v0.0.0-20210423082822-04245dca01da // indirect
 	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
 	google.golang.org/grpc v1.33.2 // indirect

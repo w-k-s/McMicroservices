@@ -2,7 +2,6 @@ package test
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,9 +27,7 @@ func (suite *StockHandlerTestSuite) SetupTest() {
 }
 
 func (suite *StockHandlerTestSuite) TearDownTest() {
-	if err := ClearTables(); err != nil {
-		log.Fatalf("Failed to tear down StockHandlerTestSuite: %s", err)
-	}
+	clearTables()
 }
 
 // -- SUITE

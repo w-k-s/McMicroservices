@@ -65,3 +65,10 @@ func (h Handler) MustEncodeProblem(w http.ResponseWriter, req *http.Request, err
 		log.Printf("Failed to encode problem '%v'. Reason: %s", err, problemError)
 	}
 }
+
+func (h Handler) MustMarshal(result []byte, err error) []byte{
+	if err != nil {
+		log.Fatalf("Marshal to json failed. Reason: %s", err)
+	}
+	return result
+}

@@ -3,13 +3,9 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 
-	"schneider.vip/problem"
-
 	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
-	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
@@ -24,6 +20,7 @@ type OrderHandler interface {
 }
 
 type orderHandler struct {
+	Handler
 	orderService svc.OrderService
 }
 
@@ -44,31 +41,16 @@ func (oh orderHandler) HandleOrderMessage(ctx context.Context, request msg.Reque
 	var (
 		orderRequest  svc.OrderRequest
 		orderResponse svc.OrderResponse
-		responseJson  []byte
 		err           error
-		kitchenError  k.Error
 	)
 	if err = decoder.Decode(&orderRequest); err != nil {
-		return OrderFailed, problem.New(
-			problem.Type(fmt.Sprintf("/api/v1/problems/%d", k.ErrUnmarshalling)),
-			problem.Status(k.ErrUnmarshalling.Status()),
-			problem.Title(k.ErrUnmarshalling.Name()),
-			problem.Detail(err.Error()),
-		).JSON()
+		// TODO: This should probably go in to a failed-to-process queue
+		log.Printf("Failed to decode order request. Reason: %s", err)
+		return "",[]byte{}
 	}
 
-	if orderResponse, kitchenError = oh.orderService.ProcessOrder(ctx, orderRequest); kitchenError != nil {
-		return OrderFailed, problem.New(
-			problem.Type(fmt.Sprintf("/api/v1/problems/%d", kitchenError.Code())),
-			problem.Status(kitchenError.Code().Status()),
-			problem.Title(kitchenError.Code().Name()),
-			problem.Detail(kitchenError.Error()),
-		).JSON()
+	if orderResponse, err = oh.orderService.ProcessOrder(ctx, orderRequest); err != nil{
+		return OrderFailed, oh.MustMarshal(json.Marshal(orderResponse))
 	}
-
-	if responseJson, err = json.Marshal(orderResponse); err != nil {
-		log.Printf("UNEXPECTED: Failed to marshal orderResponse %v", orderResponse)
-	}
-
-	return OrderReady, msg.ResponseBody(responseJson)
+	return OrderReady, oh.MustMarshal(json.Marshal(orderResponse))
 }

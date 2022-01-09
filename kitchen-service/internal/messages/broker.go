@@ -32,7 +32,7 @@ func (rt ResponseTopic) StringPointer() *string {
 
 func (tr TopicRouter) Topics() []string {
 	topics := []string{}
-	for key, _ := range tr {
+	for key := range tr {
 		topics = append(topics, key)
 	}
 	return topics

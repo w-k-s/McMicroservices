@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
+
+const messageWaitTimeout = time.Duration(90) * time.Second
 
 type OrderHandlerTestSuite struct {
 	suite.Suite
@@ -40,14 +41,21 @@ func (suite *OrderHandlerTestSuite) TearDownTest() {
 	if err = testKafkaConsumer.Unsubscribe(); err != nil {
 		log.Fatalf("Failed to unsubscribe testKafkaConsumer in OrderHandlerTestSuite: %s", err)
 	}
-	if err = ClearTables(); err != nil {
-		log.Fatalf("Failed to clear tables in OrderHandlerTestSuite: %s", err)
-	}
 }
 
 // -- SUITE
 
-func (suite *OrderHandlerTestSuite) Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully() {
+// This method ensures tests are run sequentially (i.e. not in parallel). Running tests in parallel causes flakiness.
+func (suite *OrderHandlerTestSuite) Test_orderProcessingSequentially() {
+    
+    suite.T().Run("", func(t *testing.T) { suite.GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully() })
+	clearTables()
+	
+    suite.T().Run("", func(t *testing.T) { suite.GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected() })
+}
+
+func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully() {
+	log.Printf("%q -------------------\n", suite.T().Name())
 
 	// GIVEN
 	receiver := NewKafkaReceiver(testKafkaConsumer)
@@ -62,7 +70,7 @@ func (suite *OrderHandlerTestSuite) Test_GIVEN_sufficientStock_WHEN_orderIsRecei
 		},
 	})
 
-	time.Sleep(time.Duration(25) * time.Second)
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, app.InventoryDelivery).Plus(time.Second)
 
 	// WHEN
 	orderId := uint64(time.Now().Unix())
@@ -75,9 +83,10 @@ func (suite *OrderHandlerTestSuite) Test_GIVEN_sufficientStock_WHEN_orderIsRecei
 		},
 	})
 
-	time.Sleep(time.Duration(40) * time.Second)
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderReady)).Plus(time.Second)
 
 	// THEN -- order prepared
+	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
 	actual := receiver.FirstMessage(string(app.OrderReady))
 	expected := fmt.Sprintf("{\"id\":%d,\"status\":\"READY\"}", orderId)
 	assert.JSONEq(suite.T(), expected, actual)
@@ -86,20 +95,25 @@ func (suite *OrderHandlerTestSuite) Test_GIVEN_sufficientStock_WHEN_orderIsRecei
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
 	w := httptest.NewRecorder()
 	testApp.Router().ServeHTTP(w, r)
-	var stockResponse svc.StockResponse
 
-	assert.Nil(suite.T(), json.Unmarshal(w.Body.Bytes(), &stockResponse))
 	assert.Equal(suite.T(), 200, w.Code)
-	assert.Equal(suite.T(), 3, len(stockResponse.Stock))
-	assert.Equal(suite.T(), "Mustard", stockResponse.Stock[0].Name)
-	assert.Equal(suite.T(), uint(1), stockResponse.Stock[0].Units)
-	assert.Equal(suite.T(), "Onions", stockResponse.Stock[1].Name)
-	assert.Equal(suite.T(), uint(1), stockResponse.Stock[1].Units)
-	assert.Equal(suite.T(), "Tomatoes", stockResponse.Stock[2].Name)
-	assert.Equal(suite.T(), uint(1), stockResponse.Stock[2].Units)
+	assert.JSONEq(suite.T(), `{
+		"stock": [{
+			"name": "Mustard",
+			"units": 1
+		}, {
+			"name": "Onions",
+			"units": 1
+		}, {
+			"name": "Tomatoes",
+			"units": 1
+		}]
+	}`, w.Body.String())
+	log.Println("-------------------")
 }
 
-func (suite *OrderHandlerTestSuite) Test_GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected() {
+func (suite *OrderHandlerTestSuite) GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected() {
+	log.Printf("%q -------------------\n", suite.T().Name())
 
 	// GIVEN
 	receiver := NewKafkaReceiver(testKafkaConsumer)
@@ -107,8 +121,9 @@ func (suite *OrderHandlerTestSuite) Test_GIVEN_insufficientStock_WHEN_orderIsRec
 	defer receiver.Close()
 
 	// WHEN
+	orderId := uint64(time.Now().Unix())
 	suite.sender.MustSendAsJSON(app.CreateOrder, svc.OrderRequest{
-		OrderId: uint64(time.Now().Unix()),
+		OrderId: orderId,
 		Toppings: []string{
 			"Tomatoes",
 			"Onions",
@@ -116,15 +131,16 @@ func (suite *OrderHandlerTestSuite) Test_GIVEN_insufficientStock_WHEN_orderIsRec
 		},
 	})
 
-	time.Sleep(time.Duration(25) * time.Second)
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderFailed)).Plus(time.Second)
 
 	// THEN
+	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
 	message := receiver.FirstMessage(string(app.OrderFailed))
 	assert.NotEmpty(suite.T(), message, "Expected Topic to contain a message but no message was published")
-	assert.JSONEq(suite.T(), `{
-		"detail":"Insufficient stock of \"Tomatoes\"",
-		"status":400,
-		"title":"INSUFFICIENT_STOCK",
-		"type":"/api/v1/problems/2006"
-	}`, message)
+	assert.JSONEq(suite.T(), fmt.Sprintf(`{
+		"reason":"Insufficient stock of \"Tomatoes\"",
+		"id":%d,
+		"status":"FAILED"
+	}`,orderId), message)
+	log.Println("-------------------")
 }

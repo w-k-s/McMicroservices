@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"log"
 	"sort"
 	"testing"
 
@@ -32,9 +31,7 @@ func (suite *StockDaoTestSuite) SetupTest() {
 // -- TEARDOWN
 
 func (suite *StockDaoTestSuite) TearDownTest() {
-	if err := ClearTables(); err != nil {
-		log.Fatalf("Failed to tear down StockDaoTestSuite: %s", err)
-	}
+	clearTables()
 }
 
 // -- SUITE
