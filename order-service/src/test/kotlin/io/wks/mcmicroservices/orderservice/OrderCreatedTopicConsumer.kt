@@ -32,3 +32,27 @@ class OrderCreatedTopicConsumer(private val objectMapper: ObjectMapper) {
         this.stack.clear()
     }
 }
+
+@Profile("test")
+@Component
+class OrderReadyConsumer() {
+
+    val latch = CountDownLatch(1)
+
+    @KafkaListener(topics = ["order_ready"])
+    fun receive(consumerRecord: ConsumerRecord<String, String>) {
+        latch.countDown()
+    }
+}
+
+@Profile("test")
+@Component
+class OrderFailedConsumer() {
+
+    val latch = CountDownLatch(1)
+
+    @KafkaListener(topics = ["order_failed"])
+    fun receive(consumerRecord: ConsumerRecord<String, String>) {
+        latch.countDown()
+    }
+}

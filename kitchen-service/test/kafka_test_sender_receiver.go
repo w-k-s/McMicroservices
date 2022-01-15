@@ -68,7 +68,7 @@ func (kr KafkaReceiver) Close() {
 	kr.received.Clear()
 }
 
-func (kr KafkaReceiver) Listen() {
+func (kr KafkaReceiver)  Listen() {
 	go func() {
 		run := true
 		for run {

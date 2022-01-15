@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	cts "github.com/romnn/testcontainers"
+	cts_kafka "github.com/romnn/testcontainers/kafka"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
@@ -29,7 +31,9 @@ var (
 	testContainerPostgres        tc.Container
 	testContainerDataSourceName  string
 	testDB                       *sql.DB
-	testKafkaCluster             *KafkaCluster
+	testKafkaCcontainer          tc.Container
+	testZookeeperContainer       tc.Container
+	testKafkaNetwork       tc.Network
 	testKafkaConsumer            *kafka.Consumer
 	testKafkaProducer            *kafka.Producer
 	testConfig                   *cfg.Config
@@ -92,13 +96,27 @@ func requestDatabaseTestContainer() cfg.DBConfig {
 }
 
 func requestKafkaTestContainer() cfg.BrokerConfig {
-	testKafkaCluster = NewKafkaCluster()
-	testKafkaCluster.StartCluster()
+	
+	var(
+		kafkaConfig *cts_kafka.ContainerConnectionConfig
+		err error
+	)
 
-	log.Printf("\nBoostrap Servers: %s\n", testKafkaCluster.GetKafkaHost())
+	testKafkaCcontainer, kafkaConfig, testZookeeperContainer, testKafkaNetwork, err = cts_kafka.StartKafkaContainer(context.Background(), cts_kafka.ContainerOptions{
+		ContainerOptions: cts.ContainerOptions{
+		},
+	})
+	if err != nil {
+		log.Fatalf("Failed to start the kafka container: %v", err)
+	}
+
+	//testKafkaCluster = NewKafkaCluster()
+	//testKafkaCluster.StartCluster()
+
+	log.Printf("\nBoostrap Servers: %s\n", kafkaConfig.Brokers)
 
 	return cfg.NewBrokerConfig(
-		[]string{testKafkaCluster.GetKafkaHost()},
+		kafkaConfig.Brokers,
 		"plaintext",
 		cfg.NewConsumerConfig("group_id", "earliest"),
 	)
@@ -106,15 +124,19 @@ func requestKafkaTestContainer() cfg.BrokerConfig {
 
 func TestMain(m *testing.M) {
 	defer func(exitCode int) {
-		defer func(){
+		defer func(exitCode int){
 			if r := recover(); r != nil{
 				log.Printf("Panic while cleaning tests. Reason: %v\n", r)
 			}
-		}()
-
-		log.Println("Cleaning up after tests")
+			os.Exit(exitCode)
+		}(exitCode)
 
 		testApp.Close()
+
+		log.Println("Cleaning up after tests")
+		testKafkaNetwork.Remove(context.Background())
+		testKafkaCcontainer.Terminate(context.Background())
+		testZookeeperContainer.Terminate(context.Background())
 
 		if err := testContainerPostgres.Terminate(testContainerDatabaseContext); err != nil {
 			log.Printf("Error closing Test Postgres Container: %s", err)

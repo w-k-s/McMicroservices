@@ -1,6 +1,7 @@
 package io.wks.mcmicroservices.orderservice
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
 import io.konform.validation.Validation
 import org.springframework.data.annotation.CreatedDate
@@ -22,6 +23,13 @@ data class OrderId constructor(@JsonValue val value: String) {
         fun of(value: String) = OrderId(value)
     }
 }
+
+data class OrderEvent(
+    val id: OrderId,
+    val status: Order.Status,
+    @JsonProperty("reason")
+    val failureReason: String? = null
+)
 
 data class Toppings constructor(
     @JsonValue

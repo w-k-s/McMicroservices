@@ -122,7 +122,8 @@ internal class OrderControllerIT : BaseSpringBootTest() {
             .isEqualTo(Order(
                 id = OrderId(),
                 toppings = orderRequest.toppings,
-                status = Order.Status.PREPARING
+                status = Order.Status.PREPARING,
+                version = 1
             ))
     }
 }

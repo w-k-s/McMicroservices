@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,15 +11,18 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
+	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
-const messageWaitTimeout = time.Duration(5) * time.Minute
+const messageWaitTimeout = /*time.Duration(30) */ time.Minute
 
 type OrderHandlerTestSuite struct {
 	suite.Suite
 	sender KafkaSender
+	stockDao dao.StockDao
 }
 
 func TestOrderStockHandlerTestSuite(t *testing.T) {
@@ -35,6 +39,7 @@ func (suite *OrderHandlerTestSuite) SetupTest() {
 		string(app.OrderFailed),
 	}, nil)
 	suite.sender = NewKafkaSender(testKafkaProducer)
+	suite.stockDao = db.MustOpenStockDao(testDB)
 }
 
 func (suite *OrderHandlerTestSuite) TearDownTest() {
@@ -73,8 +78,17 @@ func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_T
 		},
 	})
 
-	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, app.InventoryDelivery).
-		Plus(time.Second)
+	Await(messageWaitTimeout).
+		PollEvery(time.Duration(30) * time.Second).
+		Until(func() bool {
+			tx := suite.stockDao.MustBeginTx()
+			defer tx.Commit()
+			stock,err := suite.stockDao.Get(context.Background(), tx)
+			if err != nil{
+				return false
+			}
+			return len(stock) == 3 && stock[0].Units() == 2
+		}).Start()
 
 	// WHEN
 	orderId := uint64(time.Now().Unix())
@@ -87,8 +101,17 @@ func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_T
 		},
 	})
 
-	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderReady)).
-		Plus(time.Second)
+	Await(messageWaitTimeout).
+		PollEvery(time.Duration(30) * time.Second).
+		Until(func() bool {
+			tx := suite.stockDao.MustBeginTx()
+			defer tx.Commit()
+			stock,err := suite.stockDao.Get(context.Background(), tx)
+			if err != nil{
+				return false
+			}
+			return len(stock) == 3 && stock[0].Units() == 1
+		}).Start()
 
 	// THEN -- order prepared
 	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)

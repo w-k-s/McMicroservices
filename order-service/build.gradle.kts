@@ -35,8 +35,6 @@ dependencies {
     implementation("org.liquibase:liquibase-core")
     implementation("org.zalando:problem-spring-web:${problem.version}")
     implementation("io.konform:konform-jvm:${konform.version}")
-    implementation("org.springframework.cloud:spring-cloud-stream")
-    implementation("org.springframework.cloud:spring-cloud-stream-binder-kafka")
     implementation("org.springframework.kafka:spring-kafka")
     runtimeOnly("org.postgresql:postgresql")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
