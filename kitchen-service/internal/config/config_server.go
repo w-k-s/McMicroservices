@@ -6,10 +6,11 @@ import (
 )
 
 type ServerConfig struct {
-	port           int
-	readTimeout    time.Duration
-	writeTimeout   time.Duration
-	maxHeaderBytes int
+	port                int
+	readTimeout         time.Duration
+	writeTimeout        time.Duration
+	maxHeaderBytes      int
+	shutdownGracePeriod time.Duration
 }
 
 func makeServerConfig(b *serverConfigBuilder) ServerConfig {
@@ -18,6 +19,7 @@ func makeServerConfig(b *serverConfigBuilder) ServerConfig {
 		b.readTimeout,
 		b.writeTimeout,
 		b.maxHeaderBytes,
+		b.shutdownGracePeriod,
 	}
 }
 
@@ -46,22 +48,31 @@ func (s ServerConfig) WriteTimeout() time.Duration {
 	return s.writeTimeout
 }
 
+func (s ServerConfig) ShutdownGracePeriod() time.Duration {
+	if s.shutdownGracePeriod <= 0 {
+		return 5 * time.Second
+	}
+	return s.shutdownGracePeriod
+}
+
 func (s ServerConfig) ListenAddress() string {
 	return fmt.Sprintf(":%d", s.port)
 }
 
 type serverConfigBuilder struct {
-	port           int
-	readTimeout    time.Duration
-	writeTimeout   time.Duration
-	maxHeaderBytes int
+	port                int
+	readTimeout         time.Duration
+	writeTimeout        time.Duration
+	maxHeaderBytes      int
+	shutdownGracePeriod time.Duration
 }
 
 func NewServerConfigBuilder() *serverConfigBuilder {
 	return &serverConfigBuilder{
-		port:         8080,
-		readTimeout:  time.Duration(0),
-		writeTimeout: time.Duration(0),
+		port:                8080,
+		readTimeout:         time.Duration(0),
+		writeTimeout:        time.Duration(0),
+		shutdownGracePeriod: time.Duration(0),
 	}
 }
 
@@ -82,6 +93,11 @@ func (b *serverConfigBuilder) SetWriteTimeout(timeout time.Duration) *serverConf
 
 func (b *serverConfigBuilder) SetMaxHeaderBytes(maxHeaderBytes int) *serverConfigBuilder {
 	b.maxHeaderBytes = maxHeaderBytes
+	return b
+}
+
+func (b *serverConfigBuilder) SetShutdownGracePeriod(shutdownGracePeriod time.Duration) *serverConfigBuilder {
+	b.shutdownGracePeriod = shutdownGracePeriod
 	return b
 }
 

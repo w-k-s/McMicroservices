@@ -8,9 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-	cts "github.com/romnn/testcontainers"
-	cts_kafka "github.com/romnn/testcontainers/kafka"
+	"github.com/streadway/amqp"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
@@ -31,14 +29,16 @@ var (
 	testContainerPostgres        tc.Container
 	testContainerDataSourceName  string
 	testDB                       *sql.DB
-	testKafkaCcontainer          tc.Container
-	testZookeeperContainer       tc.Container
-	testKafkaNetwork       tc.Network
-	testKafkaConsumer            *kafka.Consumer
-	testKafkaProducer            *kafka.Producer
-	testConfig                   *cfg.Config
-	testApp                      *app.App
-	err                          error
+
+	testContainerRabbitMQContext context.Context
+	testRabbitMQContainer        tc.Container
+	testAmqpConnection           *amqp.Connection
+	testAmqpConsumer             *amqp.Channel
+	testAmqpProducer             *amqp.Channel
+
+	testConfig *cfg.Config
+	testApp    *app.App
+	err        error
 )
 
 func init() {
@@ -46,14 +46,14 @@ func init() {
 		cfg.NewServerConfigBuilder().
 			SetPort(9898).
 			Build(),
-		requestKafkaTestContainer(),
+		requestRabbitMqTestContainer(),
 		requestDatabaseTestContainer(),
 	); err != nil {
 		log.Fatalf("Failed to configure application for tests. Reason: %s", err)
 	}
 
 	testDB = db.MustOpenPool(testConfig.Database())
-	testKafkaConsumer, testKafkaProducer = msg.MustNewConsumerProducerPair(testConfig.Broker())
+	testAmqpConnection, testAmqpConsumer, testAmqpProducer = msg.Must(msg.NewAmqpConnection(testConfig.Broker()))
 
 	if testApp, err = app.Init(testConfig); err != nil {
 		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
@@ -95,49 +95,54 @@ func requestDatabaseTestContainer() cfg.DBConfig {
 		Build()
 }
 
-func requestKafkaTestContainer() cfg.BrokerConfig {
-	
-	var(
-		kafkaConfig *cts_kafka.ContainerConnectionConfig
-		err error
-	)
+func requestRabbitMqTestContainer() cfg.BrokerConfig {
 
-	testKafkaCcontainer, kafkaConfig, testZookeeperContainer, testKafkaNetwork, err = cts_kafka.StartKafkaContainer(context.Background(), cts_kafka.ContainerOptions{
-		ContainerOptions: cts.ContainerOptions{
-		},
-	})
-	if err != nil {
-		log.Fatalf("Failed to start the kafka container: %v", err)
+	testContainerRabbitMqReq := tc.ContainerRequest{
+		Image:        "rabbitmq:3.8.11-management",
+		ExposedPorts: []string{"5672/tcp"},
+		Env:          map[string]string{},
+		WaitingFor:   wait.ForLog("Server startup complete"),
 	}
 
-	//testKafkaCluster = NewKafkaCluster()
-	//testKafkaCluster.StartCluster()
+	testContainerRabbitMQContext = context.Background()
+	testRabbitMQContainer, err = tc.GenericContainer(testContainerRabbitMQContext, tc.GenericContainerRequest{
+		ContainerRequest: testContainerRabbitMqReq,
+		Started:          true,
+	})
+	if err != nil {
+		log.Fatalf("Failed to request rabbitmq test container: %s", err)
+	}
 
-	log.Printf("\nBoostrap Servers: %s\n", kafkaConfig.Brokers)
+	rabbitMqHost, _ := testRabbitMQContainer.Host(testContainerRabbitMQContext)
+	rabbitMqPort, _ := testRabbitMQContainer.MappedPort(testContainerRabbitMQContext, "5672")
 
-	return cfg.NewBrokerConfig(
-		kafkaConfig.Brokers,
-		"plaintext",
-		cfg.NewConsumerConfig("group_id", "earliest"),
-	)
+	return cfg.NewBrokerConfig(fmt.Sprintf("amqp://%s:%s", rabbitMqHost, rabbitMqPort.Port()))
 }
 
 func TestMain(m *testing.M) {
 	defer func(exitCode int) {
-		defer func(exitCode int){
-			if r := recover(); r != nil{
+		defer func(exitCode int) {
+			if r := recover(); r != nil {
 				log.Printf("Panic while cleaning tests. Reason: %v\n", r)
 			}
 			os.Exit(exitCode)
 		}(exitCode)
 
-		testApp.Close()
-
 		log.Println("Cleaning up after tests")
-		testKafkaNetwork.Remove(context.Background())
-		testKafkaCcontainer.Terminate(context.Background())
-		testZookeeperContainer.Terminate(context.Background())
 
+		testApp.Close()
+		if err := testAmqpConsumer.Close(); err != nil {
+			log.Printf("Failed to close test amqp Consumer Channel. %s", err)
+		}
+		if err := testAmqpProducer.Close(); err != nil {
+			log.Printf("Failed to close test amqp Producer Channel. %s", err)
+		}
+		if err := testAmqpConnection.Close(); err != nil {
+			log.Printf("Failed to close test amqp Connection. %s", err)
+		}
+		if err := testRabbitMQContainer.Terminate(testContainerRabbitMQContext); err != nil {
+			log.Printf("Error closing Test RabbitMQ Container: %s", err)
+		}
 		if err := testContainerPostgres.Terminate(testContainerDatabaseContext); err != nil {
 			log.Printf("Error closing Test Postgres Container: %s", err)
 		}

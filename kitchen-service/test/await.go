@@ -5,66 +5,65 @@ import (
 	"time"
 )
 
-type pollIntervalBuilder interface{
+type pollIntervalBuilder interface {
 	PollEvery(d time.Duration) untilTrueBuilder
 }
 
-type untilTrueBuilder interface{
+type untilTrueBuilder interface {
 	Until(condition conditionFunc) awaitBuilder
 }
 
-type awaitBuilder interface{
-	Start() 
+type awaitBuilder interface {
+	Start()
 }
 
 type conditionFunc func() bool
-type await struct{
-	timeout time.Duration
+type await struct {
+	timeout      time.Duration
 	pollInterval time.Duration
-	condition conditionFunc
+	condition    conditionFunc
 }
 
-func Await(d time.Duration) pollIntervalBuilder{
+func Await(d time.Duration) pollIntervalBuilder {
 	return await{
 		timeout: d,
 	}
 }
 
-func (a await) PollEvery(d time.Duration) untilTrueBuilder{
+func (a await) PollEvery(d time.Duration) untilTrueBuilder {
 	a.pollInterval = d
 	return a
 }
 
-func (a await) Until(condition conditionFunc) awaitBuilder{
+func (a await) Until(condition conditionFunc) awaitBuilder {
 	a.condition = condition
 	return a
 }
 
-func (a await) Start(){
+func (a await) Start() {
 	ticker := time.NewTicker(a.pollInterval)
 	defer ticker.Stop()
 
-    timeout := make(chan bool)
-	go func(){
+	timeout := make(chan bool)
+	go func() {
 		time.Sleep(a.timeout)
 		timeout <- true
 	}()
 
-    go func() {
-        for {
-            select {
-            case <-timeout:
+	go func() {
+		for {
+			select {
+			case <-timeout:
 				log.Print("Timeout without condition pass")
-                return
-            case <-ticker.C:
-                if a.condition(){
+				return
+			case <-ticker.C:
+				if a.condition() {
 					log.Print("Condition passed")
 					timeout <- true
 				}
-            }
-        }
-    }()
-	
-	<- timeout
-}
+			}
+		}
+	}()
 
+	<-timeout
+}

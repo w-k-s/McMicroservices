@@ -2,6 +2,7 @@ package kitchen
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
@@ -32,6 +33,13 @@ func NewStockItem(name string, units uint) (StockItem, Error) {
 		name,
 		units,
 	}, nil
+}
+
+func Must(item StockItem, err Error) StockItem {
+	if err != nil {
+		log.Fatalf("Failed to create stock item. Reason: %q", err)
+	}
+	return item
 }
 
 func NewAccountFromRecord(record StockItemRecord) (StockItem, error) {

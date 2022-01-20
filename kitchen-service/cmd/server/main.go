@@ -2,8 +2,6 @@ package main
 
 import (
 	"flag"
-	"log"
-	"net/http"
 
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
@@ -37,27 +35,9 @@ func main() {
 	// This results in a panic.
 	flag.Parse()
 
-	var (
-		err     error
-		handler *app.App
-	)
-
-	if config, err = cfg.LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion); err != nil {
-		log.Fatalf("failed to load config file. Reason: %s", err)
-	}
-
-	if handler, err = app.Init(config); err != nil {
-		log.Fatalf("failed to init application. Reason: %s", err)
-	}
+	config = cfg.Must(cfg.LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion))
+	handler := app.Must(app.Init(config))
 	defer handler.Close()
 
-	// TODO: Close server smoothly
-	s := &http.Server{
-		Addr:           config.Server().ListenAddress(),
-		Handler:        handler.Router(),
-		ReadTimeout:    config.Server().ReadTimeout(),
-		WriteTimeout:   config.Server().WriteTimeout(),
-		MaxHeaderBytes: config.Server().MaxHeaderBytes(),
-	}
-	log.Fatal(s.ListenAndServe())
+	handler.ListenAndServe()
 }

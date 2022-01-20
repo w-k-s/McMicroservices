@@ -37,10 +37,7 @@ port     = 5432
 sslmode  = "disable"
 
 [[broker]]
-bootstrap_servers = ["localhost"]
-
-[[broker.consumer]]
-group_id = "group_id"
+server_address = "amqp://localhost:5672"
 `
 
 func createTestConfigFile(content string, uri string) error {
@@ -81,6 +78,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_loadin
 	assert.Equal(suite.T(), 1048576, config.Server().MaxHeaderBytes())
 	assert.Equal(suite.T(), time.Duration(10)*time.Second, config.Server().ReadTimeout())
 	assert.Equal(suite.T(), time.Duration(10)*time.Second, config.Server().WriteTimeout())
+	assert.Equal(suite.T(), time.Duration(5)*time.Second, config.Server().ShutdownGracePeriod())
 	assert.Equal(suite.T(), "postgres", config.Database().DriverName())
 	assert.Equal(suite.T(), "jack.torrence", config.Database().Username())
 	assert.Equal(suite.T(), "password", config.Database().Password())
@@ -89,10 +87,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_loadin
 	assert.Equal(suite.T(), 5432, config.Database().Port())
 	assert.Equal(suite.T(), "disable", config.Database().SslMode())
 	assert.Equal(suite.T(), "host=localhost port=5432 user=jack.torrence password=password dbname=overlook sslmode=disable", config.Database().ConnectionString())
-	assert.Equal(suite.T(), []string{"localhost"}, config.Broker().BootstrapServers())
-	assert.Equal(suite.T(), "group_id", config.Broker().ConsumerConfig().GroupId())
-	assert.Equal(suite.T(), "earliest", config.Broker().ConsumerConfig().AutoOffsetReset())
-	assert.Equal(suite.T(), "plaintext", config.Broker().SecurityProtocol())
+	assert.Equal(suite.T(), "amqp://localhost:5672", config.Broker().ServerAddress())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_configFileDoesNotExistAtDefaultPath_THEN_errorIsReturned() {
@@ -130,6 +125,7 @@ port = 8085
 read_timeout = 5
 write_timeout = 3
 max_header_bytes = 2097152
+shutdown_grace_period = 10
 
 [database]
 username = "danny.torrence"
@@ -140,11 +136,7 @@ port     = 5432
 sslmode  = "disable"
 
 [[broker]]
-bootstrap_servers = ["localhost"]
-security_protocol = "ssl"
-
-[[broker.consumer]]
-group_id = "group_id"
+server_address = "amqp://localhost:5672"
 `
 	assert.Nil(suite.T(), createTestConfigFile(customConfigFileContents, DefaultConfigFilePath()))
 
@@ -157,8 +149,9 @@ group_id = "group_id"
 	assert.Equal(suite.T(), 8085, config.Server().Port())
 	assert.Equal(suite.T(), ":8085", config.Server().ListenAddress())
 	assert.Equal(suite.T(), 2097152, config.Server().MaxHeaderBytes())
-	assert.Equal(suite.T(), time.Duration(5)*time.Second, config.Server().ReadTimeout())
-	assert.Equal(suite.T(), time.Duration(3)*time.Second, config.Server().WriteTimeout())
+	assert.Equal(suite.T(), 5*time.Second, config.Server().ReadTimeout())
+	assert.Equal(suite.T(), 3*time.Second, config.Server().WriteTimeout())
+	assert.Equal(suite.T(), 10*time.Second, config.Server().ShutdownGracePeriod())
 	assert.Equal(suite.T(), "postgres", config.Database().DriverName())
 	assert.Equal(suite.T(), "danny.torrence", config.Database().Username())
 	assert.Equal(suite.T(), "password", config.Database().Password())
@@ -166,10 +159,7 @@ group_id = "group_id"
 	assert.Equal(suite.T(), 5432, config.Database().Port())
 	assert.Equal(suite.T(), "disable", config.Database().SslMode())
 	assert.Equal(suite.T(), "host=localhost port=5432 user=danny.torrence password=password dbname=tony sslmode=disable", config.Database().ConnectionString())
-	assert.Equal(suite.T(), []string{"localhost"}, config.Broker().BootstrapServers())
-	assert.Equal(suite.T(), "group_id", config.Broker().ConsumerConfig().GroupId())
-	assert.Equal(suite.T(), "earliest", config.Broker().ConsumerConfig().AutoOffsetReset())
-	assert.Equal(suite.T(), "ssl", config.Broker().SecurityProtocol())
+	assert.Equal(suite.T(), "amqp://localhost:5672", config.Broker().ServerAddress())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileIsEmpty_THEN_errorIsReturned() {
@@ -190,8 +180,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFil
 	assert.Contains(suite.T(), err.Error(), "Database password is required")
 	assert.Contains(suite.T(), err.Error(), "Database port is required")
 	assert.Contains(suite.T(), err.Error(), "Database name is required")
-	assert.Contains(suite.T(), err.Error(), "servers list can not be empty")
-	assert.Contains(suite.T(), err.Error(), "Kafka Consumer GroupId is required")
+	assert.Contains(suite.T(), err.Error(), "RabbitMQ Server Address is required")
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileDoesNotContainValidToml_THEN_errorIsReturned() {

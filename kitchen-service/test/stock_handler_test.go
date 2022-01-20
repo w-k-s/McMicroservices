@@ -1,19 +1,22 @@
 package test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
-	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
+	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
+	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
 type StockHandlerTestSuite struct {
 	suite.Suite
+	sender   TestMessageSender
+	stockDao dao.StockDao
 }
 
 func TestStockHandlerTestSuite(t *testing.T) {
@@ -23,31 +26,43 @@ func TestStockHandlerTestSuite(t *testing.T) {
 // -- SETUP
 
 func (suite *StockHandlerTestSuite) SetupTest() {
+	suite.sender = NewTestMessageSender(testAmqpProducer)
+	suite.stockDao = db.MustOpenStockDao(testDB)
+	clearTables()
 }
 
 func (suite *StockHandlerTestSuite) TearDownTest() {
-	clearTables()
+
 }
 
 // -- SUITE
 
 func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
-	NewKafkaSender(testKafkaProducer).
-		MustSendAsJSON(app.InventoryDelivery, svc.StockRequest{
-			Stock: []svc.StockItemRequest{
-				{Name: "Cheese", Units: uint(5)},
-				{Name: "Donuts", Units: uint(7)},
-			},
-		})
-
-	time.Sleep(time.Duration(20) * time.Second)
-
 	// WHEN
+	suite.sender.MustSendAsJSON("inventory_delivery", "", svc.StockRequest{
+		Stock: []svc.StockItemRequest{
+			{Name: "Cheese", Units: uint(5)},
+			{Name: "Donuts", Units: uint(7)},
+		},
+	})
+
+	// THEN
+	Await(messageWaitTimeout).
+		PollEvery(messagePollInterval).
+		Until(func() bool {
+			tx := suite.stockDao.MustBeginTx()
+			defer tx.Commit()
+			stock, err := suite.stockDao.Get(context.Background(), tx)
+			if err != nil {
+				return false
+			}
+			return len(stock) == 2
+		}).Start()
+
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
 	w := httptest.NewRecorder()
 	testApp.Router().ServeHTTP(w, r)
 
-	// THEN
 	assert.Equal(suite.T(), 200, w.Code)
 	assert.JSONEq(suite.T(), `{
 		"stock": [{

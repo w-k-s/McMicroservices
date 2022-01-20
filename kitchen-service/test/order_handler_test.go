@@ -12,16 +12,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
-	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
+	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
-const messageWaitTimeout = /*time.Duration(30) */ time.Minute
+const messageWaitTimeout = time.Minute
+const messagePollInterval = 5 * time.Second
 
 type OrderHandlerTestSuite struct {
 	suite.Suite
-	sender KafkaSender
+	sender   TestMessageSender
 	stockDao dao.StockDao
 }
 
@@ -32,21 +33,12 @@ func TestOrderStockHandlerTestSuite(t *testing.T) {
 // -- SETUP
 
 func (suite *OrderHandlerTestSuite) SetupTest() {
-	testKafkaConsumer.SubscribeTopics([]string{
-		app.CreateOrder,
-		app.InventoryDelivery,
-		string(app.OrderReady),
-		string(app.OrderFailed),
-	}, nil)
-	suite.sender = NewKafkaSender(testKafkaProducer)
+	suite.sender = NewTestMessageSender(testAmqpProducer)
 	suite.stockDao = db.MustOpenStockDao(testDB)
 }
 
 func (suite *OrderHandlerTestSuite) TearDownTest() {
-	var err error
-	if err = testKafkaConsumer.Unsubscribe(); err != nil {
-		log.Fatalf("Failed to unsubscribe testKafkaConsumer in OrderHandlerTestSuite: %s", err)
-	}
+	log.Println("Tearing down OrderHandlerTestSuite")
 }
 
 // -- SUITE
@@ -66,33 +58,21 @@ func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_T
 	log.Printf("%q -------------------\n", suite.T().Name())
 
 	// GIVEN
-	receiver := NewKafkaReceiver(testKafkaConsumer)
-	receiver.Listen()
+	receiver := NewTestMessageReceiver(testAmqpConsumer)
+	receiver.Listen("orders", "order.ready")
 	defer receiver.Close()
 
-	suite.sender.MustSendAsJSON(app.InventoryDelivery, svc.StockRequest{
-		Stock: []svc.StockItemRequest{
-			{Name: "Tomatoes", Units: 2},
-			{Name: "Onions", Units: 2},
-			{Name: "Mustard", Units: 2},
-		},
+	tx := suite.stockDao.MustBeginTx()
+	_ = suite.stockDao.Increase(context.Background(), tx, k.Stock{
+		k.Must(k.NewStockItem("Tomatoes", 2)),
+		k.Must(k.NewStockItem("Onions", 2)),
+		k.Must(k.NewStockItem("Mustard", 2)),
 	})
-
-	Await(messageWaitTimeout).
-		PollEvery(time.Duration(30) * time.Second).
-		Until(func() bool {
-			tx := suite.stockDao.MustBeginTx()
-			defer tx.Commit()
-			stock,err := suite.stockDao.Get(context.Background(), tx)
-			if err != nil{
-				return false
-			}
-			return len(stock) == 3 && stock[0].Units() == 2
-		}).Start()
+	tx.Commit()
 
 	// WHEN
 	orderId := uint64(time.Now().Unix())
-	suite.sender.MustSendAsJSON(app.CreateOrder, svc.OrderRequest{
+	suite.sender.MustSendAsJSON("orders", "order.new", svc.OrderRequest{
 		OrderId: orderId,
 		Toppings: []string{
 			"Tomatoes",
@@ -101,25 +81,28 @@ func (suite *OrderHandlerTestSuite) GIVEN_sufficientStock_WHEN_orderIsReceived_T
 		},
 	})
 
+	// THEN -- order prepared
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, "orders", "order.ready").
+		Plus(time.Second)
+
+	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
+	actual := receiver.FirstMessage("orders", "order.ready")
+	expected := fmt.Sprintf("{\"id\":%d,\"status\":\"READY\"}", orderId)
+	assert.JSONEq(suite.T(), expected, actual)
+
+	// THEN -- stock updated
 	Await(messageWaitTimeout).
-		PollEvery(time.Duration(30) * time.Second).
+		PollEvery(messagePollInterval).
 		Until(func() bool {
 			tx := suite.stockDao.MustBeginTx()
 			defer tx.Commit()
-			stock,err := suite.stockDao.Get(context.Background(), tx)
-			if err != nil{
+			stock, err := suite.stockDao.Get(context.Background(), tx)
+			if err != nil {
 				return false
 			}
 			return len(stock) == 3 && stock[0].Units() == 1
 		}).Start()
 
-	// THEN -- order prepared
-	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
-	actual := receiver.FirstMessage(string(app.OrderReady))
-	expected := fmt.Sprintf("{\"id\":%d,\"status\":\"READY\"}", orderId)
-	assert.JSONEq(suite.T(), expected, actual)
-
-	// THEN -- stock updated
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
 	w := httptest.NewRecorder()
 	testApp.Router().ServeHTTP(w, r)
@@ -144,13 +127,13 @@ func (suite *OrderHandlerTestSuite) GIVEN_insufficientStock_WHEN_orderIsReceived
 	log.Printf("%q -------------------\n", suite.T().Name())
 
 	// GIVEN
-	receiver := NewKafkaReceiver(testKafkaConsumer)
-	receiver.Listen()
+	receiver := NewTestMessageReceiver(testAmqpConsumer)
+	receiver.Listen("orders", "order.failed")
 	defer receiver.Close()
 
 	// WHEN
 	orderId := uint64(time.Now().Unix())
-	suite.sender.MustSendAsJSON(app.CreateOrder, svc.OrderRequest{
+	suite.sender.MustSendAsJSON("orders", "order.new", svc.OrderRequest{
 		OrderId: orderId,
 		Toppings: []string{
 			"Tomatoes",
@@ -159,12 +142,12 @@ func (suite *OrderHandlerTestSuite) GIVEN_insufficientStock_WHEN_orderIsReceived
 		},
 	})
 
-	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, string(app.OrderFailed)).
+	// THEN
+	receiver.WaitUntilNextMessageInTopic(messageWaitTimeout, "orders", "order.failed").
 		Plus(time.Second)
 
-	// THEN
 	log.Printf("\n%q: Received: %s\n", suite.T().Name(), receiver)
-	message := receiver.FirstMessage(string(app.OrderFailed))
+	message := receiver.FirstMessage("orders", "order.failed")
 	assert.NotEmpty(suite.T(), message, "Expected Topic to contain a message but no message was published")
 	assert.JSONEq(suite.T(), fmt.Sprintf(`{
 		"reason":"Insufficient stock of \"Tomatoes\"",

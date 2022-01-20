@@ -38,8 +38,7 @@ func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DB
 		&validators.StringLengthInRange{Name: "Database Name", Field: config.db.host, Min: 1, Max: 0, Message: "Database name is required"},
 		&validators.StringInclusion{Name: "Database SSL Mode", Field: config.db.sslMode, List: []string{"disable", "require", "verify-ca", "verify-full"}, Message: "Database SSL Mode is required"},
 		&validators.StringLengthInRange{Name: "Migration Directory", Field: config.db.host, Min: 1, Max: 0, Message: "Migration Directory path is required"},
-		&boostrapServersValidator{Name: "Bootstrap servers", Field: config.broker.boostrapServers},
-		&validators.StringLengthInRange{Name: "Kafka Consumer Group Id", Field: config.broker.consumerConfig.groupId, Min: 1, Max: 0, Message: "Kafka Consumer GroupId is required"},
+		&validators.StringLengthInRange{Name: "RabbitMQ Server Address", Field: config.broker.serverAddress, Min: 1, Max: 0, Message: "RabbitMQ Server Address is required"},
 	)
 
 	if errors.HasAny() {
@@ -47,22 +46,6 @@ func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DB
 	}
 
 	return config, nil
-}
-
-type boostrapServersValidator struct {
-	Name  string
-	Field []string
-}
-
-func (v *boostrapServersValidator) IsValid(errors *validate.Errors) {
-	if len(v.Field) == 0 {
-		errors.Add(v.Name, "servers list can not be empty")
-	}
-	for _, server := range v.Field {
-		if len(server) == 0 {
-			errors.Add(v.Name, "server list can not contain empty strings")
-		}
-	}
 }
 
 func (c Config) Server() ServerConfig {
@@ -84,6 +67,7 @@ func readToml(bytes []byte) (*Config, error) {
 			WriteTimeoutSeconds int64 `toml:"write_timeout"`
 			ReadTimeoutSeconds  int64 `toml:"read_timeout"`
 			MaxHeaderBytes      int   `toml:"max_header_bytes"`
+			ShutdownGracePeriod int64 `toml:"shutdown_grace_period"`
 		}
 		Database struct {
 			Username     string
@@ -95,14 +79,7 @@ func readToml(bytes []byte) (*Config, error) {
 			MigrationDir string `toml:"migration_dir"`
 		}
 		Broker struct {
-			BootrstrapServers []string `toml:"bootstrap_servers"`
-			SecurityProtocol  string   `toml:"security_protocol"`
-			Consumer          struct {
-				GroupId         string `toml:"group_id"`
-				AutoOffsetReset string `toml:"auto_offset_reset"`
-			}
-			Producer struct {
-			}
+			ServerAddress string `toml:"server_address"`
 		}
 	}
 
@@ -113,19 +90,14 @@ func readToml(bytes []byte) (*Config, error) {
 
 	return NewConfig(
 		ServerConfig{
-			port:           mutableConfig.Server.Port,
-			readTimeout:    time.Duration(mutableConfig.Server.ReadTimeoutSeconds) * time.Second,
-			writeTimeout:   time.Duration(mutableConfig.Server.WriteTimeoutSeconds) * time.Second,
-			maxHeaderBytes: mutableConfig.Server.MaxHeaderBytes,
+			port:                mutableConfig.Server.Port,
+			readTimeout:         time.Duration(mutableConfig.Server.ReadTimeoutSeconds) * time.Second,
+			writeTimeout:        time.Duration(mutableConfig.Server.WriteTimeoutSeconds) * time.Second,
+			maxHeaderBytes:      mutableConfig.Server.MaxHeaderBytes,
+			shutdownGracePeriod: time.Duration(mutableConfig.Server.ShutdownGracePeriod) * time.Second,
 		},
 		BrokerConfig{
-			boostrapServers:  mutableConfig.Broker.BootrstrapServers,
-			securityProtocol: mutableConfig.Broker.SecurityProtocol,
-			consumerConfig: NewConsumerConfig(
-				mutableConfig.Broker.Consumer.GroupId,
-				mutableConfig.Broker.Consumer.AutoOffsetReset,
-			),
-			producerConfig: NewProducerConfig(),
+			serverAddress: mutableConfig.Broker.ServerAddress,
 		},
 		DBConfig{
 			username:     mutableConfig.Database.Username,
@@ -199,6 +171,13 @@ func LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion string) (*
 	}
 
 	return nil, fmt.Errorf("Config file must start with file:// or s3://")
+}
+
+func Must(config *Config, err error) *Config {
+	if err != nil {
+		log.Fatalf("failed to load config file. Reason: %s", err)
+	}
+	return config
 }
 
 func ConfigureLogging() error {
