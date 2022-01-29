@@ -6,29 +6,35 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/streadway/amqp"
-	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
+	"github.com/Shopify/sarama"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
+	"go.uber.org/multierr"
+)
+
+const (
+	TopicCreateOrder string = "order_created"
+	TopicOrderReady  string = "order_ready"
+	TopicOrderFailed string = "order_failed"
 )
 
 type OrderHandler interface {
 	HandleOrderMessage(ctx context.Context, request []byte) (string, []byte)
+	Close() error
 }
 
 type orderHandler struct {
 	Handler
 	orderService svc.OrderService
-	consumer     *amqp.Channel
-	producer     *amqp.Channel
+	consumer     sarama.Consumer
+	producer     sarama.SyncProducer
 	cancelFunc   context.CancelFunc
 }
 
 func NewOrderHandler(
 	orderService svc.OrderService,
-	consumer *amqp.Channel,
-	producer *amqp.Channel,
+	consumer sarama.Consumer,
+	producer sarama.SyncProducer,
 ) OrderHandler {
-
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	orderHandler := &orderHandler{
 		orderService: orderService,
@@ -37,76 +43,54 @@ func NewOrderHandler(
 		cancelFunc:   cancelFunc,
 	}
 
-	go orderHandler.listenForOrderEvents(ctx)
+	orderHandler.listenForStockDeliveryEvents(ctx)
 
 	return orderHandler
 }
 
-func (s orderHandler) listenForOrderEvents(ctx context.Context) {
-	var (
-		queueName      string = "kitchen_service.order_queue"
-		messageChannel <-chan amqp.Delivery
-		err            error
+func (oh orderHandler) Close() error {
+	return multierr.Combine(
+		oh.consumer.Close(),
+		oh.producer.Close(),
 	)
-	if _, err = s.consumer.QueueDeclare(queueName, msg.Durable, !msg.AutoDelete, !msg.Exclusive, !msg.NoWait, nil); err != nil {
-		log.Fatalf("Failed to declare queue %q. Reason: %s", queueName, err)
+}
+
+func (oh orderHandler) listenForStockDeliveryEvents(ctx context.Context) {
+	var (
+		partitionList []int32
+		err           error
+	)
+	if partitionList, err = oh.consumer.Partitions(TopicCreateOrder); err != nil {
+		log.Printf("Failed to get partition list for stockHandler. Reason: %q", err)
+		return
 	}
 
-	if err = s.consumer.QueueBind(
-		queueName,         // queue name
-		"order.new",       // routing key
-		msg.OrderExchange, // exchange
-		!msg.NoWait,
-		nil,
-	); err != nil {
-		log.Fatalf("Failed to bind queue %q to exchange %q. Reason: %s", queueName, msg.OrderExchange, err)
+	// Create a cosumer for each partition.
+	// Each consumer will listen for messages asynchronously
+	// All of the consumers will send their messages to a single messageChannel
+	initialOffset := sarama.OffsetOldest
+	messageChannel := make(chan *sarama.ConsumerMessage)
+	for _, partition := range partitionList {
+		pc, _ := oh.consumer.ConsumePartition(TopicCreateOrder, partition, initialOffset)
+		go func(pc sarama.PartitionConsumer) {
+			for message := range pc.Messages() {
+				messageChannel <- message
+			}
+		}(pc)
 	}
 
-	if messageChannel, err = s.consumer.Consume(
-		queueName,      // queue
-		"",             // consumer
-		msg.AutoAck,    // auto-ack
-		!msg.Exclusive, // exclusive
-		!msg.NoLocal,   // no-local
-		!msg.NoWait,    // no-wait
-		nil,            // args
-	); err != nil {
-		log.Fatalf("Queue %q failed to consume from exchange %q. Reason: %s", queueName, msg.OrderExchange, err)
-	}
-
+	// Hanldle the messages
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return // returning not to leak the goroutine
 			case message := <-messageChannel:
-				request := message.Body
-				if len(request) == 0 {
-					continue
-				}
-				key, resp := s.HandleOrderMessage(ctx, request)
-				if len(key) == 0 {
-					break
-				}
-				if err = s.producer.Publish(
-					msg.OrderExchange, // exchange
-					key,               // routing key
-					false,             // mandatory
-					false,             // immediate
-					amqp.Publishing{
-						ContentType: "text/plain",
-						Body:        []byte(resp),
-					}); err != nil {
-					log.Printf("Failed to deliver message %q (routing key:  %q). Reason: %q", string(resp), key, err)
-				}
-
+				oh.publishResponse(oh.HandleOrderMessage(ctx, message.Value))
+				continue
 			}
 		}
 	}()
-}
-
-func (oh orderHandler) Close() {
-	oh.cancelFunc()
 }
 
 func (oh orderHandler) HandleOrderMessage(ctx context.Context, request []byte) (string, []byte) {
@@ -126,7 +110,25 @@ func (oh orderHandler) HandleOrderMessage(ctx context.Context, request []byte) (
 	}
 
 	if orderResponse, err = oh.orderService.ProcessOrder(ctx, orderRequest); err != nil {
-		return "order.failed", oh.MustMarshal(json.Marshal(orderResponse))
+		return TopicOrderFailed, oh.MustMarshal(json.Marshal(orderResponse))
 	}
-	return "order.ready", oh.MustMarshal(json.Marshal(orderResponse))
+	return TopicOrderReady, oh.MustMarshal(json.Marshal(orderResponse))
+}
+
+func (oh orderHandler) publishResponse(topic string, body []byte) {
+	var (
+		partition int32
+		offset    int64
+		err       error
+	)
+	message := &sarama.ProducerMessage{
+		Topic:     topic,
+		Partition: -1,
+		Value:     sarama.StringEncoder(body),
+	}
+	if partition, offset, err = oh.producer.SendMessage(message); err != nil {
+		log.Printf("Failed to publish message %q to topic %q (partition: %d). Reason: %q", string(body), topic, -1, err)
+		return
+	}
+	log.Printf("Message %q published to topic %q with partition %d and offset %d", string(body), topic, partition, offset)
 }

@@ -36,7 +36,7 @@ func main() {
 	flag.Parse()
 
 	config = cfg.Must(cfg.LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion))
-	handler := app.Must(app.Init(config))
+	handler := app.Must(app.NewAppBuilder(config).Build())
 	defer handler.Close()
 
 	handler.ListenAndServe()

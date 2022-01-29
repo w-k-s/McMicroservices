@@ -7,31 +7,44 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/streadway/amqp"
-	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
+	"github.com/Shopify/sarama"
+
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
+const (
+	TopicInventoryDelivery string = "inventory_delivery"
+)
+
 type stockHandler struct {
 	Handler
-	consumerChannel *amqp.Channel
-	cancelFunc      context.CancelFunc
-	stockSvc        svc.StockService
+	stockSvc   svc.StockService
+	consumer   sarama.Consumer
+	cancelFunc context.CancelFunc
 }
 
-func NewStockHandler(stockSvc svc.StockService, consumerChannel *amqp.Channel) stockHandler {
+func NewStockHandler(stockSvc svc.StockService, consumer sarama.Consumer) stockHandler {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	handler := stockHandler{
 		Handler{},
-		consumerChannel,
-		cancelFunc,
 		stockSvc,
+		consumer,
+		cancelFunc,
 	}
 
-	go handler.listenForInventoryEvents(ctx)
+	handler.listenForStockDeliveryEvents(ctx)
 
 	return handler
+}
+
+func (s stockHandler) Close() error {
+	var err error
+	if err = s.consumer.Close(); err != nil {
+		log.Printf("Failed to close order consumer. Reason: %q", err)
+	}
+	s.cancelFunc()
+	return err
 }
 
 func (s stockHandler) GetStock(w http.ResponseWriter, req *http.Request) {
@@ -49,48 +62,38 @@ func (s stockHandler) GetStock(w http.ResponseWriter, req *http.Request) {
 	s.MustEncodeJson(w, resp, http.StatusOK)
 }
 
-func (s stockHandler) Close() {
-	s.cancelFunc()
-}
-
-func (s stockHandler) listenForInventoryEvents(ctx context.Context) {
+func (s stockHandler) listenForStockDeliveryEvents(ctx context.Context) {
 	var (
-		queueName      string = "kitchen_service.inventory_queue"
-		messageChannel <-chan amqp.Delivery
-		err            error
+		partitionList []int32
+		err           error
 	)
-	if _, err = s.consumerChannel.QueueDeclare(queueName, msg.Durable, !msg.AutoDelete, !msg.Exclusive, !msg.NoWait, nil); err != nil {
-		log.Fatalf("Failed to declare queue %q. Reason: %s", queueName, err)
+	if partitionList, err = s.consumer.Partitions(TopicInventoryDelivery); err != nil {
+		log.Printf("Failed to get partition list for stockHandler. Reason: %q", err)
+		return
 	}
 
-	if err = s.consumerChannel.QueueBind(
-		queueName,                     // queue name
-		"",                            // routing key
-		msg.InventoryDeliveryExchange, // exchange
-		!msg.NoWait,
-		nil); err != nil {
-		log.Fatalf("Failed to bind queue %q to exchange %q. Reason: %s", queueName, msg.OrderExchange, err)
+	// Create a cosumer for each partition.
+	// Each consumer will listen for messages asynchronously
+	// All of the consumers will send their messages to a single messageChannel
+	initialOffset := sarama.OffsetOldest
+	messageChannel := make(chan *sarama.ConsumerMessage)
+	for _, partition := range partitionList {
+		pc, _ := s.consumer.ConsumePartition(TopicInventoryDelivery, partition, initialOffset)
+		go func(pc sarama.PartitionConsumer) {
+			for message := range pc.Messages() {
+				messageChannel <- message
+			}
+		}(pc)
 	}
 
-	if messageChannel, err = s.consumerChannel.Consume(
-		queueName,      // queue
-		"",             // consumer
-		msg.AutoAck,    // auto-ack
-		!msg.Exclusive, // exclusive
-		!msg.NoLocal,   // no-local
-		!msg.NoWait,    // no-wait
-		nil,            // args
-	); err != nil {
-		log.Fatalf("Queue %q failed to consume from exchange %q. Reason: %s", queueName, msg.OrderExchange, err)
-	}
-
+	// Hanldle the messages
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return // returning not to leak the goroutine
 			case message := <-messageChannel:
-				s.receiveInventory(ctx, message.Body)
+				s.receiveInventory(ctx, message.Value)
 				continue
 			}
 		}
@@ -118,4 +121,5 @@ func (s stockHandler) receiveInventory(ctx context.Context, request []byte) {
 	}
 
 	log.Printf("Inventory updated with stock %q", receiveInventoryRequest.Stock)
+	return
 }

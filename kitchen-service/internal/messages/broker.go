@@ -1,77 +1,38 @@
 package messages
 
 import (
-	"fmt"
 	"log"
 
-	"github.com/streadway/amqp"
+	"github.com/Shopify/sarama"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 )
 
-const (
-	Durable    = true
-	Exclusive  = true
-	Immediate  = true
-	Internal   = true
-	Mandatory  = true
-	NoLocal    = true
-	NoWait     = true
-	AutoAck    = true
-	AutoDelete = true
+type ConsumerFactory func(cfg.BrokerConfig) (sarama.Consumer, error)
+type ProducerFactory func(cfg.BrokerConfig) (sarama.SyncProducer, error)
 
-	OrderExchange             = "orders"
-	InventoryDeliveryExchange = "inventory_delivery"
-)
-
-func NewAmqpConnection(brokerConfig cfg.BrokerConfig) (*amqp.Connection, *amqp.Channel, *amqp.Channel, error) {
-	var (
-		conn     *amqp.Connection
-		consumer *amqp.Channel
-		producer *amqp.Channel
-		err      error
-	)
-	if conn, err = amqp.Dial(brokerConfig.ServerAddress()); err != nil {
-		return nil, nil, nil, fmt.Errorf("Failed to connect to RabbitMQ. Reason: %w", err)
-	}
-
-	if consumer, err = conn.Channel(); err != nil {
-		return nil, nil, nil, fmt.Errorf("Failed to open consumer channel. Reason: %w", err)
-	}
-
-	if producer, err = conn.Channel(); err != nil {
-		return nil, nil, nil, fmt.Errorf("Failed to open consumer channel. Reason: %w", err)
-	}
-
-	return conn, consumer, producer, nil
+func NewConsumer(brokerConfig cfg.BrokerConfig) (sarama.Consumer, error) {
+	consumerConfig := sarama.NewConfig()
+	consumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
+	return sarama.NewConsumer(brokerConfig.BootstrapServers(), consumerConfig)
 }
 
-func Must(conn *amqp.Connection, c *amqp.Channel, p *amqp.Channel, err error) (*amqp.Connection, *amqp.Channel, *amqp.Channel) {
+func NewProducer(brokerConfig cfg.BrokerConfig) (sarama.SyncProducer, error) {
+	producerConfig := sarama.NewConfig()
+	producerConfig.Producer.Partitioner = sarama.NewRandomPartitioner
+	producerConfig.Producer.RequiredAcks = sarama.WaitForAll
+	return sarama.NewSyncProducer(brokerConfig.BootstrapServers(), producerConfig)
+}
+
+func MustConsumer(c sarama.Consumer, err error) sarama.Consumer {
 	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ. Reason: %s", err)
+		log.Fatalf("Failed to create consumer. Reason: %s", err)
 	}
-	return conn, c, p
+	return c
 }
 
-func MustDeclareExchanges(consumer *amqp.Channel, producer *amqp.Channel) {
-	exchanges := []struct {
-		Name string
-		Type string
-	}{
-		{Name: OrderExchange, Type: "topic"},
-		{Name: InventoryDeliveryExchange, Type: "fanout"},
+func MustProducer(p sarama.SyncProducer, err error) sarama.SyncProducer {
+	if err != nil {
+		log.Fatalf("Failed to create producer. Reason: %s", err)
 	}
-
-	for _, exchange := range exchanges {
-		if err := producer.ExchangeDeclare(
-			exchange.Name, // name
-			exchange.Type, // type
-			Durable,       // durable
-			!AutoDelete,   // auto-deleted
-			!Internal,     // internal
-			!NoWait,       // no-wait
-			nil,           // arguments
-		); err != nil {
-			log.Fatalf("Failed to declare exchange %q. Reason: %q", exchange.Name, err)
-		}
-	}
+	return p
 }

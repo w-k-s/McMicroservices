@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
+	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
@@ -26,20 +28,29 @@ func TestStockHandlerTestSuite(t *testing.T) {
 // -- SETUP
 
 func (suite *StockHandlerTestSuite) SetupTest() {
-	suite.sender = NewTestMessageSender(testAmqpProducer)
+	testKafkaConsumer.SubscribeTopics([]string{
+		app.CreateOrder,
+		app.InventoryDelivery,
+		string(app.OrderReady),
+		string(app.OrderFailed),
+	}, nil)
+	suite.sender = NewTestMessageSender(testKafkaProducer)
 	suite.stockDao = db.MustOpenStockDao(testDB)
 	clearTables()
 }
 
 func (suite *StockHandlerTestSuite) TearDownTest() {
-
+	var err error
+	if err = testKafkaConsumer.Unsubscribe(); err != nil {
+		log.Fatalf("Failed to unsubscribe testKafkaConsumer in OrderHandlerTestSuite: %s", err)
+	}
 }
 
 // -- SUITE
 
 func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
 	// WHEN
-	suite.sender.MustSendAsJSON("inventory_delivery", "", svc.StockRequest{
+	suite.sender.MustSendAsJSON(app.InventoryDelivery, svc.StockRequest{
 		Stock: []svc.StockItemRequest{
 			{Name: "Cheese", Units: uint(5)},
 			{Name: "Donuts", Units: uint(7)},

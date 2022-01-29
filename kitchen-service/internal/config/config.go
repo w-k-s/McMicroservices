@@ -38,7 +38,8 @@ func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DB
 		&validators.StringLengthInRange{Name: "Database Name", Field: config.db.host, Min: 1, Max: 0, Message: "Database name is required"},
 		&validators.StringInclusion{Name: "Database SSL Mode", Field: config.db.sslMode, List: []string{"disable", "require", "verify-ca", "verify-full"}, Message: "Database SSL Mode is required"},
 		&validators.StringLengthInRange{Name: "Migration Directory", Field: config.db.host, Min: 1, Max: 0, Message: "Migration Directory path is required"},
-		&validators.StringLengthInRange{Name: "RabbitMQ Server Address", Field: config.broker.serverAddress, Min: 1, Max: 0, Message: "RabbitMQ Server Address is required"},
+		&boostrapServersValidator{Name: "Bootstrap servers", Field: config.broker.boostrapServers},
+		&validators.StringLengthInRange{Name: "Kafka Consumer Group Id", Field: config.broker.consumerConfig.groupId, Min: 1, Max: 0, Message: "Kafka Consumer GroupId is required"},
 	)
 
 	if errors.HasAny() {
@@ -79,7 +80,14 @@ func readToml(bytes []byte) (*Config, error) {
 			MigrationDir string `toml:"migration_dir"`
 		}
 		Broker struct {
-			ServerAddress string `toml:"server_address"`
+			BootrstrapServers []string `toml:"bootstrap_servers"`
+			SecurityProtocol  string   `toml:"security_protocol"`
+			Consumer          struct {
+				GroupId         string `toml:"group_id"`
+				AutoOffsetReset string `toml:"auto_offset_reset"`
+			}
+			Producer struct {
+			}
 		}
 	}
 
@@ -97,7 +105,13 @@ func readToml(bytes []byte) (*Config, error) {
 			shutdownGracePeriod: time.Duration(mutableConfig.Server.ShutdownGracePeriod) * time.Second,
 		},
 		BrokerConfig{
-			serverAddress: mutableConfig.Broker.ServerAddress,
+			boostrapServers:  mutableConfig.Broker.BootrstrapServers,
+			securityProtocol: mutableConfig.Broker.SecurityProtocol,
+			consumerConfig: NewConsumerConfig(
+				mutableConfig.Broker.Consumer.GroupId,
+				mutableConfig.Broker.Consumer.AutoOffsetReset,
+			),
+			producerConfig: NewProducerConfig(),
 		},
 		DBConfig{
 			username:     mutableConfig.Database.Username,
@@ -202,4 +216,20 @@ func ConfigureLogging() error {
 	log.SetOutput(multiWriter)
 
 	return nil
+}
+
+type boostrapServersValidator struct {
+	Name  string
+	Field []string
+}
+
+func (v *boostrapServersValidator) IsValid(errors *validate.Errors) {
+	if len(v.Field) == 0 {
+		errors.Add(v.Name, "servers list can not be empty")
+	}
+	for _, server := range v.Field {
+		if len(server) == 0 {
+			errors.Add(v.Name, "server list can not contain empty strings")
+		}
+	}
 }

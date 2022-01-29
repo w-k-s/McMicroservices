@@ -4,120 +4,102 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 	"time"
 
-	"github.com/streadway/amqp"
+	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"golang.org/x/net/context"
 )
 
 // Sender
 
 type TestMessageSender struct {
-	producer *amqp.Channel
+	producer *kafka.Producer
 }
 
-func NewTestMessageSender(producer *amqp.Channel) TestMessageSender {
+func NewTestMessageSender(producer *kafka.Producer) TestMessageSender {
 	return TestMessageSender{
 		producer,
 	}
 }
 
-func (ms TestMessageSender) MustSendAsJSON(exchange, key string, message interface{}) {
-	var (
-		bytes []byte
-		err   error
-	)
-
-	if bytes, err = json.Marshal(message); err != nil {
-		log.Fatalf("Failed to marshal message %q. Reason: %q", string(bytes), err)
+// TODO: Sending takes ages in tests, can we fix this?
+func (ks TestMessageSender) MustSendAsJSON(topic string, message interface{}) {
+	bytes, err := json.Marshal(message)
+	if err != nil {
+		log.Fatalln(err)
 	}
 
-	if err = ms.producer.Publish(exchange, key, true, false, amqp.Publishing{
-		ContentType: "application/json",
-		Body:        bytes,
-	}); err != nil {
-		log.Fatalf("Failed to send message %q to exchange %q. Reason: %q", string(bytes), exchange, err)
+	if err = ks.producer.Produce(&kafka.Message{
+		TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
+		Value:          bytes,
+	}, nil); err != nil {
+		log.Fatalln(err)
 	}
 
-	log.Printf("Sent message on exchange %q: %q\n", exchange, string(bytes))
+	log.Printf("Sent message on topic %q: %q\n", topic, string(bytes))
 }
 
 // Receiver
 
 type TestMessageReceiver struct {
 	received          receivedMessages
-	consumer          *amqp.Channel
+	consumer          *kafka.Consumer
 	ctx               context.Context
 	cancelFunc        context.CancelFunc
-	newMessageChannel chan string
+	newMessageChannel chan *kafka.Message
 }
 
-func NewTestMessageReceiver(consumer *amqp.Channel) TestMessageReceiver {
+func NewTestMessageReceiver(consumer *kafka.Consumer) TestMessageReceiver {
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	newMessageChannel := make(chan string)
 	return TestMessageReceiver{
 		received:          receivedMessages{},
 		consumer:          consumer,
 		ctx:               ctx,
 		cancelFunc:        cancelFunc,
-		newMessageChannel: newMessageChannel,
+		newMessageChannel: make(chan *kafka.Message),
 	}
 }
 
-func (mr TestMessageReceiver) Close() {
-	log.Printf("Closing TestMessageReceiver")
-	mr.cancelFunc()
-	mr.received.Clear()
+func (kr TestMessageReceiver) Close() {
+	log.Printf("Closing KafkaReceiver")
+	kr.cancelFunc()
+	kr.received.Clear()
 }
 
-func (mr TestMessageReceiver) Listen(exchange, key string) {
-	var (
-		messageChannel <-chan amqp.Delivery
-		q              amqp.Queue
-		err            error
-	)
-
-	if q, err = mr.consumer.QueueDeclare("", false, true, false, false, nil); err != nil {
-		log.Fatalf("Failed to create a queue to listen to key %q in exchange %q", key, exchange)
-	}
-
-	if err = mr.consumer.QueueBind(q.Name, key, exchange, false, nil); err != nil {
-		log.Fatalf("Failed to bind queue %q to listen to key %q in exchange %q", q.Name, key, exchange)
-	}
-
-	if messageChannel, err = mr.consumer.Consume(q.Name, "", true, false, false, false, nil); err != nil {
-		log.Fatalf("Failed to create consumer channel. Reason: %q", err)
-	}
-
+func (kr TestMessageReceiver) Listen() {
 	go func() {
 		run := true
 		for run {
 			select {
-			case <-mr.ctx.Done():
+			case <-kr.ctx.Done():
 				run = false
-			case message := <-messageChannel:
-				mr.handleMessage(exchange, key, message.Body)
+			default:
+				kr.handleMessage()
 			}
 		}
 	}()
 }
 
-func (mr TestMessageReceiver) handleMessage(exchange, key string, body []byte) {
-	path := fmt.Sprintf("%s/%s", exchange, key)
-	if list, ok := mr.received[path]; ok {
-		mr.received[path] = append(list, string(body))
-	} else {
-		mr.received[path] = []string{string(body)}
+func (kr TestMessageReceiver) handleMessage() {
+	msg, err := kr.consumer.ReadMessage(-1)
+	if err != nil {
+		log.Printf("Consumer error (kind: %s): %v (%v)\n", reflect.TypeOf(err), err, msg)
 	}
-	mr.newMessageChannel <- path
+
+	if list, ok := kr.received[*msg.TopicPartition.Topic]; ok {
+		kr.received[*msg.TopicPartition.Topic] = append(list, string(msg.Value))
+	} else {
+		kr.received[*msg.TopicPartition.Topic] = []string{string(msg.Value)}
+	}
+	kr.newMessageChannel <- msg
 }
 
-func (mr TestMessageReceiver) WaitUntilNextMessageInTopic(timeout time.Duration, exchange, key string) waitBuilder {
+func (kr TestMessageReceiver) WaitUntilNextMessageInTopic(timeout time.Duration, topic string) waitBuilder {
 	done := make(chan bool)
-	path := fmt.Sprintf("%s/%s", exchange, key)
 	go func() {
-		log.Printf("TestMessageReceiver: Waiting for message from exchange %q with key %q\n", exchange, key)
+		log.Printf("KafkaReceiver: Waiting for message in topic %q\n", topic)
 		time.Sleep(timeout)
 		done <- true
 	}()
@@ -125,23 +107,24 @@ func (mr TestMessageReceiver) WaitUntilNextMessageInTopic(timeout time.Duration,
 	for {
 		select {
 		case <-done:
-			log.Printf("TestMessageReceiver: Waiting for message from exchange %q with key %q timed-out\n", exchange, key)
+			log.Printf("KafkaReceiver: Waiting for message in topic %q timed-out\n", topic)
 			return waitBuilder{}
-		case newMessagePath := <-mr.newMessageChannel:
-			if newMessagePath == path {
-				log.Printf("TestMessageReceiver: Received message in %q\n", path)
+		case newMessage := <-kr.newMessageChannel:
+			newMessageTopic := *newMessage.TopicPartition.Topic
+			if newMessageTopic == topic {
+				log.Printf("KafkaReceiver: Received message in topic %q: %q\n", newMessageTopic, string(newMessage.Value))
 				return waitBuilder{}
 			}
 		}
 	}
 }
 
-func (mr TestMessageReceiver) FirstMessage(exchange, key string) string {
-	return mr.received.FirstMessage(fmt.Sprintf("%s/%s", exchange, key))
+func (kr TestMessageReceiver) FirstMessage(topic string) string {
+	return kr.received.FirstMessage(topic)
 }
 
-func (mr TestMessageReceiver) String() string {
-	return mr.received.String()
+func (kr TestMessageReceiver) String() string {
+	return kr.received.String()
 }
 
 type waitBuilder struct{}
