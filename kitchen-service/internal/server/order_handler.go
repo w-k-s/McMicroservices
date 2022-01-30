@@ -43,7 +43,7 @@ func NewOrderHandler(
 		cancelFunc:   cancelFunc,
 	}
 
-	orderHandler.listenForStockDeliveryEvents(ctx)
+	orderHandler.listenForNewOrderEvents(ctx)
 
 	return orderHandler
 }
@@ -55,7 +55,8 @@ func (oh orderHandler) Close() error {
 	)
 }
 
-func (oh orderHandler) listenForStockDeliveryEvents(ctx context.Context) {
+func (oh orderHandler) listenForNewOrderEvents(ctx context.Context) {
+	log.Printf("Listening for New Orders")
 	var (
 		partitionList []int32
 		err           error
@@ -72,6 +73,7 @@ func (oh orderHandler) listenForStockDeliveryEvents(ctx context.Context) {
 	messageChannel := make(chan *sarama.ConsumerMessage)
 	for _, partition := range partitionList {
 		pc, _ := oh.consumer.ConsumePartition(TopicCreateOrder, partition, initialOffset)
+		log.Printf("Creating a comsumer for topic %q on partition '%d' with offset '%d'", TopicCreateOrder, partition, initialOffset)
 		go func(pc sarama.PartitionConsumer) {
 			for message := range pc.Messages() {
 				messageChannel <- message
@@ -94,7 +96,7 @@ func (oh orderHandler) listenForStockDeliveryEvents(ctx context.Context) {
 }
 
 func (oh orderHandler) HandleOrderMessage(ctx context.Context, request []byte) (string, []byte) {
-
+	log.Printf("Order Message received: %q\n", string(request))
 	decoder := json.NewDecoder(bytes.NewReader(request))
 	decoder.UseNumber()
 
@@ -122,9 +124,8 @@ func (oh orderHandler) publishResponse(topic string, body []byte) {
 		err       error
 	)
 	message := &sarama.ProducerMessage{
-		Topic:     topic,
-		Partition: -1,
-		Value:     sarama.StringEncoder(body),
+		Topic: topic,
+		Value: sarama.StringEncoder(body),
 	}
 	if partition, offset, err = oh.producer.SendMessage(message); err != nil {
 		log.Printf("Failed to publish message %q to topic %q (partition: %d). Reason: %q", string(body), topic, -1, err)

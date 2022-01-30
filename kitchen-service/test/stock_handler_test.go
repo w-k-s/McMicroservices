@@ -1,6 +1,6 @@
 package test
 
-import (
+/*import (
 	"context"
 	"log"
 	"net/http"
@@ -85,3 +85,4 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 		}]
 	}`, w.Body.String())
 }
+*/

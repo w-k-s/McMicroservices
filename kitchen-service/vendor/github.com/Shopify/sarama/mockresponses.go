@@ -805,7 +805,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 				Configs: configEntries,
 			})
 		case TopicResource:
-			maxMessageBytes := &ConfigEntry{Name: "max.message.bytes",
+			maxMessageBytes := &ConfigEntry{
+				Name:      "max.message.bytes",
 				Value:     "1000000",
 				ReadOnly:  false,
 				Default:   !includeSource,
@@ -822,7 +823,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 					},
 				}
 			}
-			retentionMs := &ConfigEntry{Name: "retention.ms",
+			retentionMs := &ConfigEntry{
+				Name:      "retention.ms",
 				Value:     "5000",
 				ReadOnly:  false,
 				Default:   false,
@@ -836,7 +838,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 					},
 				}
 			}
-			password := &ConfigEntry{Name: "password",
+			password := &ConfigEntry{
+				Name:      "password",
 				Value:     "12345",
 				ReadOnly:  false,
 				Default:   false,
@@ -891,7 +894,8 @@ func (mr *MockAlterConfigsResponse) For(reqBody versionedDecoder) encoderWithHea
 	res := &AlterConfigsResponse{}
 
 	for _, r := range req.Resources {
-		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{Name: r.Name,
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:     r.Name,
 			Type:     r.Type,
 			ErrorMsg: "",
 		})
@@ -910,6 +914,51 @@ func NewMockAlterConfigsResponseWithErrorCode(t TestReporter) *MockAlterConfigsR
 func (mr *MockAlterConfigsResponseWithErrorCode) For(reqBody versionedDecoder) encoderWithHeader {
 	req := reqBody.(*AlterConfigsRequest)
 	res := &AlterConfigsResponse{}
+
+	for _, r := range req.Resources {
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:      r.Name,
+			Type:      r.Type,
+			ErrorCode: 83,
+			ErrorMsg:  "",
+		})
+	}
+	return res
+}
+
+type MockIncrementalAlterConfigsResponse struct {
+	t TestReporter
+}
+
+func NewMockIncrementalAlterConfigsResponse(t TestReporter) *MockIncrementalAlterConfigsResponse {
+	return &MockIncrementalAlterConfigsResponse{t: t}
+}
+
+func (mr *MockIncrementalAlterConfigsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*IncrementalAlterConfigsRequest)
+	res := &IncrementalAlterConfigsResponse{}
+
+	for _, r := range req.Resources {
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:     r.Name,
+			Type:     r.Type,
+			ErrorMsg: "",
+		})
+	}
+	return res
+}
+
+type MockIncrementalAlterConfigsResponseWithErrorCode struct {
+	t TestReporter
+}
+
+func NewMockIncrementalAlterConfigsResponseWithErrorCode(t TestReporter) *MockIncrementalAlterConfigsResponseWithErrorCode {
+	return &MockIncrementalAlterConfigsResponseWithErrorCode{t: t}
+}
+
+func (mr *MockIncrementalAlterConfigsResponseWithErrorCode) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*IncrementalAlterConfigsRequest)
+	res := &IncrementalAlterConfigsResponse{}
 
 	for _, r := range req.Resources {
 		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
@@ -1074,6 +1123,35 @@ func (m *MockDeleteGroupsResponse) For(reqBody versionedDecoder) encoderWithHead
 	}
 	for _, group := range m.deletedGroups {
 		resp.GroupErrorCodes[group] = ErrNoError
+	}
+	return resp
+}
+
+type MockDeleteOffsetResponse struct {
+	errorCode      KError
+	topic          string
+	partition      int32
+	errorPartition KError
+}
+
+func NewMockDeleteOffsetRequest(t TestReporter) *MockDeleteOffsetResponse {
+	return &MockDeleteOffsetResponse{}
+}
+
+func (m *MockDeleteOffsetResponse) SetDeletedOffset(errorCode KError, topic string, partition int32, errorPartition KError) *MockDeleteOffsetResponse {
+	m.errorCode = errorCode
+	m.topic = topic
+	m.partition = partition
+	m.errorPartition = errorPartition
+	return m
+}
+
+func (m *MockDeleteOffsetResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	resp := &DeleteOffsetsResponse{
+		ErrorCode: m.errorCode,
+		Errors: map[string]map[int32]KError{
+			m.topic: {m.partition: m.errorPartition},
+		},
 	}
 	return resp
 }
@@ -1266,4 +1344,34 @@ func (m *MockDescribeLogDirsResponse) For(reqBody versionedDecoder) encoderWithH
 		LogDirs: m.logDirs,
 	}
 	return resp
+}
+
+type MockApiVersionsResponse struct {
+	t TestReporter
+}
+
+func NewMockApiVersionsResponse(t TestReporter) *MockApiVersionsResponse {
+	return &MockApiVersionsResponse{t: t}
+}
+
+func (mr *MockApiVersionsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*ApiVersionsRequest)
+	res := &ApiVersionsResponse{
+		Version: req.Version,
+		ApiKeys: []ApiVersionsResponseKey{
+			{
+				Version:    req.Version,
+				ApiKey:     0,
+				MinVersion: 5,
+				MaxVersion: 8,
+			},
+			{
+				Version:    req.Version,
+				ApiKey:     1,
+				MinVersion: 7,
+				MaxVersion: 11,
+			},
+		},
+	}
+	return res
 }

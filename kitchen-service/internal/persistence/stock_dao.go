@@ -104,6 +104,7 @@ func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error)
 			kitchen.stock s`,
 	)
 	if err != nil {
+		log.Printf("Failed to load stock. Reason: %q\n", err)
 		return nil, k.NewError(k.ErrDatabaseState, "Failed to load stock", err)
 	}
 	defer rows.Close()

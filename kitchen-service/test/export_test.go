@@ -8,15 +8,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
-	cts "github.com/romnn/testcontainers"
-	cts_kafka "github.com/romnn/testcontainers/kafka"
 	tc "github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
-	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
-	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 )
 
 const (
@@ -32,14 +27,7 @@ var (
 	testContainerDataSourceName  string
 	testDB                       *sql.DB
 
-	testKafkaCcontainer    tc.Container
-	testZookeeperContainer tc.Container
-	testKafkaNetwork       tc.Network
-	testKafkaConsumer      *kafka.Consumer
-	testKafkaProducer      *kafka.Producer
-
 	testConfig *cfg.Config
-	testApp    *app.App
 	err        error
 )
 
@@ -55,11 +43,7 @@ func init() {
 	}
 
 	testDB = db.MustOpenPool(testConfig.Database())
-	testKafkaConsumer, testKafkaProducer = msg.MustNewConsumerProducerPair(testConfig.Broker())
-
-	if testApp, err = app.Init(testConfig); err != nil {
-		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
-	}
+	db.MustRunMigrations(testDB, testConfig.Database())
 }
 
 func requestDatabaseTestContainer() cfg.DBConfig {
@@ -98,25 +82,8 @@ func requestDatabaseTestContainer() cfg.DBConfig {
 }
 
 func requestKafkaTestContainer() cfg.BrokerConfig {
-
-	var (
-		kafkaConfig *cts_kafka.ContainerConnectionConfig
-		err         error
-	)
-
-	testKafkaCcontainer, kafkaConfig, testZookeeperContainer, testKafkaNetwork, err = cts_kafka.StartKafkaContainer(context.Background(), cts_kafka.ContainerOptions{
-		ContainerOptions: cts.ContainerOptions{},
-	})
-	if err != nil {
-		log.Fatalf("Failed to start the kafka container: %v", err)
-	}
-
-	//testKafkaCluster = NewKafkaCluster()
-	//testKafkaCluster.StartCluster()
-
-	log.Printf("\nBoostrap Servers: %s\n", kafkaConfig.Brokers)
 	return cfg.NewBrokerConfig(
-		kafkaConfig.Brokers,
+		[]string{"localhost:9012"},
 		"plaintext",
 		cfg.NewConsumerConfig("group_id", "earliest"),
 	)
@@ -130,13 +97,6 @@ func TestMain(m *testing.M) {
 			}
 			os.Exit(exitCode)
 		}(exitCode)
-
-		testApp.Close()
-
-		log.Println("Cleaning up after tests")
-		testKafkaNetwork.Remove(context.Background())
-		testKafkaCcontainer.Terminate(context.Background())
-		testZookeeperContainer.Terminate(context.Background())
 
 		if err := testContainerPostgres.Terminate(testContainerDatabaseContext); err != nil {
 			log.Printf("Error closing Test Postgres Container: %s", err)

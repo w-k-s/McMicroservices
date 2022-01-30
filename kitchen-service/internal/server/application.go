@@ -82,9 +82,11 @@ func newApp(b *appBuilder) (*App, error) {
 	db.MustRunMigrations(pool, b.config.Database())
 
 	app := &App{
-		config: b.config,
-		mux:    mux.NewRouter(),
-		pool:   pool,
+		config:          b.config,
+		mux:             mux.NewRouter(),
+		consumerFactory: b.GetConsumerFactory(),
+		producerFactory: b.GetProducerFactory(),
+		pool:            pool,
 	}
 
 	app.registerHealthEndpoint()
