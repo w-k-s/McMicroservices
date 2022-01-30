@@ -109,7 +109,7 @@ func readToml(bytes []byte) (*Config, error) {
 			securityProtocol: mutableConfig.Broker.SecurityProtocol,
 			consumerConfig: NewConsumerConfig(
 				mutableConfig.Broker.Consumer.GroupId,
-				mutableConfig.Broker.Consumer.AutoOffsetReset,
+				MustAutoOffsetReset(mutableConfig.Broker.Consumer.AutoOffsetReset),
 			),
 			producerConfig: NewProducerConfig(),
 		},

@@ -1,81 +1,69 @@
 package test
 
-/*import (
-	"context"
+import (
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/Shopify/sarama"
+	"github.com/Shopify/sarama/mocks"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
+	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
-	dao "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
-	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
-
-type StockHandlerTestSuite struct {
-	suite.Suite
-	sender   TestMessageSender
-	stockDao dao.StockDao
-}
-
-func TestStockHandlerTestSuite(t *testing.T) {
-	suite.Run(t, new(StockHandlerTestSuite))
-}
-
-// -- SETUP
-
-func (suite *StockHandlerTestSuite) SetupTest() {
-	testKafkaConsumer.SubscribeTopics([]string{
-		app.CreateOrder,
-		app.InventoryDelivery,
-		string(app.OrderReady),
-		string(app.OrderFailed),
-	}, nil)
-	suite.sender = NewTestMessageSender(testKafkaProducer)
-	suite.stockDao = db.MustOpenStockDao(testDB)
-	clearTables()
-}
-
-func (suite *StockHandlerTestSuite) TearDownTest() {
-	var err error
-	if err = testKafkaConsumer.Unsubscribe(); err != nil {
-		log.Fatalf("Failed to unsubscribe testKafkaConsumer in OrderHandlerTestSuite: %s", err)
-	}
-}
 
 // -- SUITE
 
-func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
-	// WHEN
-	suite.sender.MustSendAsJSON(app.InventoryDelivery, svc.StockRequest{
-		Stock: []svc.StockItemRequest{
-			{Name: "Cheese", Units: uint(5)},
-			{Name: "Donuts", Units: uint(7)},
-		},
+func Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect(t *testing.T) {
+	var (
+		testConsumer = mocks.NewConsumer(t, nil)
+		testProducer = mocks.NewSyncProducer(t, nil)
+		testApp      *app.App
+		err          error
+	)
+
+	// GIVEN
+	mockProducerFactory := func(brokerConfig cfg.BrokerConfig) (sarama.SyncProducer, error) {
+		return testProducer, nil
+	}
+
+	testConsumer.SetTopicMetadata(map[string][]int32{
+		app.TopicCreateOrder:       {0},
+		app.TopicInventoryDelivery: {0},
 	})
+	_ = testConsumer.ExpectConsumePartition(app.TopicCreateOrder, 0, sarama.OffsetOldest)
+	partitionConsumer := testConsumer.ExpectConsumePartition(app.TopicInventoryDelivery, 0, sarama.OffsetOldest)
+	mockConsumerFactory := func(brokerConfig cfg.BrokerConfig) (sarama.Consumer, error) {
+		return testConsumer, nil
+	}
+
+	if testApp, err =
+		app.NewAppBuilder(testConfig).
+			SetConsumerFactory(mockConsumerFactory).
+			SetProducerFactory(mockProducerFactory).
+			Build(); err != nil {
+		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
+	}
+
+	// WHEN
+	partitionConsumer.
+		YieldMessage(&sarama.ConsumerMessage{
+			Topic:     app.TopicInventoryDelivery,
+			Partition: 0,
+			Value:     []byte(`{"stock":[{"name":"Cheese","units":5},{"name":"Donuts","units":7}]}`),
+		})
+
+	time.Sleep(5 * time.Second)
 
 	// THEN
-	Await(messageWaitTimeout).
-		PollEvery(messagePollInterval).
-		Until(func() bool {
-			tx := suite.stockDao.MustBeginTx()
-			defer tx.Commit()
-			stock, err := suite.stockDao.Get(context.Background(), tx)
-			if err != nil {
-				return false
-			}
-			return len(stock) == 2
-		}).Start()
-
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
 	w := httptest.NewRecorder()
 	testApp.Router().ServeHTTP(w, r)
 
-	assert.Equal(suite.T(), 200, w.Code)
-	assert.JSONEq(suite.T(), `{
+	assert.Equal(t, 200, w.Code)
+	assert.JSONEq(t, `{
 		"stock": [{
 			"name": "Cheese",
 			"units": 5
@@ -84,5 +72,8 @@ func (suite *StockHandlerTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_to
 			"units": 7
 		}]
 	}`, w.Body.String())
+
+	// TearDown
+	clearTables()
+	testApp.Close()
 }
-*/

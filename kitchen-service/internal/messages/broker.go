@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Shopify/sarama"
@@ -12,7 +13,7 @@ type ProducerFactory func(cfg.BrokerConfig) (sarama.SyncProducer, error)
 
 func NewConsumer(brokerConfig cfg.BrokerConfig) (sarama.Consumer, error) {
 	consumerConfig := sarama.NewConfig()
-	consumerConfig.Consumer.Offsets.Initial = sarama.OffsetOldest
+	consumerConfig.Consumer.Offsets.Initial = saramaOffset(brokerConfig.ConsumerConfig().AutoOffsetReset())
 	return sarama.NewConsumer(brokerConfig.BootstrapServers(), consumerConfig)
 }
 
@@ -35,4 +36,15 @@ func MustProducer(p sarama.SyncProducer, err error) sarama.SyncProducer {
 		log.Fatalf("Failed to create producer. Reason: %s", err)
 	}
 	return p
+}
+
+func saramaOffset(autoOffsetReset cfg.AutoOffsetReset) int64 {
+	switch autoOffsetReset {
+	case cfg.Earliest:
+		return sarama.OffsetOldest
+	case cfg.Newest:
+		return sarama.OffsetNewest
+	default:
+		panic(fmt.Sprintf("autoOffsetReset %q can not be mapped to a sarama offset", autoOffsetReset))
+	}
 }

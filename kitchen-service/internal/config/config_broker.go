@@ -1,5 +1,10 @@
 package config
 
+import (
+	"fmt"
+	"strings"
+)
+
 type BrokerConfig struct {
 	boostrapServers  []string
 	securityProtocol string
@@ -39,16 +44,30 @@ func NewBrokerConfig(
 	}
 }
 
+type AutoOffsetReset string
+
+const (
+	Earliest AutoOffsetReset = "earliest"
+	Newest   AutoOffsetReset = "newest"
+)
+
 type consumerConfig struct {
 	groupId         string
-	autoOffsetReset string
+	autoOffsetReset AutoOffsetReset
 }
 
-func NewConsumerConfig(groupId string, autoOffsetReset string) consumerConfig {
-	if autoOffsetReset == "" {
-		autoOffsetReset = "earliest"
+func MustAutoOffsetReset(autoOffsetReset string) AutoOffsetReset {
+	switch strings.ToLower(autoOffsetReset) {
+	case "earliest":
+		return Earliest
+	case "newest":
+		return Newest
+	default:
+		panic(fmt.Sprintf("Unknown or unsupported autoOffsetReset value: %q", autoOffsetReset))
 	}
+}
 
+func NewConsumerConfig(groupId string, autoOffsetReset AutoOffsetReset) consumerConfig {
 	return consumerConfig{
 		groupId,
 		autoOffsetReset,
@@ -59,7 +78,7 @@ func (cc consumerConfig) GroupId() string {
 	return cc.groupId
 }
 
-func (cc consumerConfig) AutoOffsetReset() string {
+func (cc consumerConfig) AutoOffsetReset() AutoOffsetReset {
 	return cc.autoOffsetReset
 }
 
