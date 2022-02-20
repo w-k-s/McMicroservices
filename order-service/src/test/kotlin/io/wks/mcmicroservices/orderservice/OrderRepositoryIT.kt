@@ -22,7 +22,10 @@ class OrderRepositoryIT : BaseSpringBootTest(){
         underTest.save(order)
 
         // THEN
-        assertThat(underTest.findById(order.id).get()).isEqualTo(order.copy(version = 1))
+        assertThat(underTest.findById(order.id).get())
+            .usingRecursiveComparison()
+            .ignoringFields("createdAt", "updatedAt")
+            .isEqualTo(order.copy(version = 1))
     }
 
     @Test
@@ -43,7 +46,7 @@ class OrderRepositoryIT : BaseSpringBootTest(){
         )
         assertThat(underTest.findById(order.id).get())
             .usingRecursiveComparison()
-            .ignoringFields("updatedAt")
+            .ignoringFields("createdAt", "updatedAt")
             .isEqualTo(expected)
     }
 
@@ -66,7 +69,7 @@ class OrderRepositoryIT : BaseSpringBootTest(){
         )
         assertThat(underTest.findById(order.id).get())
             .usingRecursiveComparison()
-            .ignoringFields("updatedAt")
+            .ignoringFields("createdAt", "updatedAt")
             .isEqualTo(expected)
     }
 }
