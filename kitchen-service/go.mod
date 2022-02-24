@@ -5,7 +5,6 @@ go 1.17
 require (
 	github.com/aws/aws-sdk-go v1.39.6
 	github.com/cenkalti/backoff v2.2.1+incompatible
-	github.com/confluentinc/confluent-kafka-go v1.4.2
 	github.com/gobuffalo/validate v2.0.4+incompatible
 	github.com/golang-migrate/migrate/v4 v4.14.1
 	github.com/gorilla/mux v1.8.0
