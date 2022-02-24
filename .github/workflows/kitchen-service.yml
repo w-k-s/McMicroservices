@@ -24,13 +24,13 @@ jobs:
       - name: Install dependencies
         run: |
           go get ./...
-      - name: Lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: v1.29
-          skip-go-installation: true
-          skip-pkg-cache: true
-          skip-build-cache: true
+      # - name: Lint
+      #   uses: golangci/golangci-lint-action@v2
+      #   with:
+      #     version: v1.29
+      #     skip-go-installation: true
+      #     skip-pkg-cache: true
+      #     skip-build-cache: true
 
       - name: Test
         env:
