@@ -21,6 +21,8 @@ object problem{
     const val version = "0.26.0"
 }
 
+extra["springCloudVersion"] = "2021.0.0"
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -35,6 +37,12 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.apache.httpcomponents:httpclient:4.5.13") // Required so that RestTemplate can handle 401 errors (https://stackoverflow.com/a/60455550/821110)
+}
+
+dependencyManagement {
+    imports {
+        mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
+    }
 }
 
 tasks.withType<KotlinCompile> {
