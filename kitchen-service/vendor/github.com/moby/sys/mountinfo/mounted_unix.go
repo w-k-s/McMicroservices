@@ -1,4 +1,3 @@
-//go:build linux || (freebsd && cgo) || (openbsd && cgo)
 // +build linux freebsd,cgo openbsd,cgo
 
 package mountinfo
