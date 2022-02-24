@@ -162,7 +162,7 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesEx
 	assert.Equal(suite.T(), "host=localhost port=5432 user=jack.torrence password=password dbname=overlook sslmode=disable", config.Database().ConnectionString())
 	assert.Equal(suite.T(), []string{"localhost"}, config.Broker().BootstrapServers())
 	assert.Equal(suite.T(), "group_id", config.Broker().ConsumerConfig().GroupId())
-	assert.Equal(suite.T(), "earliest", config.Broker().ConsumerConfig().AutoOffsetReset())
+	assert.Equal(suite.T(), Earliest, config.Broker().ConsumerConfig().AutoOffsetReset())
 	assert.Equal(suite.T(), "plaintext", config.Broker().SecurityProtocol())
 }
 
@@ -176,16 +176,8 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileIsEmpt
 	// THEN
 	assert.NotNil(suite.T(), err)
 	assert.Nil(suite.T(), config)
-	assert.Contains(suite.T(), err.Error(), "Database SSL Mode is required")
-	assert.Contains(suite.T(), err.Error(), "Database host is required")
-	assert.Contains(suite.T(), err.Error(), "Server port must be at least 1023")
-	assert.Contains(suite.T(), err.Error(), "Database username is required")
-	assert.Contains(suite.T(), err.Error(), "Migration Directory path is required")
-	assert.Contains(suite.T(), err.Error(), "Database password is required")
-	assert.Contains(suite.T(), err.Error(), "Database port is required")
-	assert.Contains(suite.T(), err.Error(), "Database name is required")
-	assert.Contains(suite.T(), err.Error(), "servers list can not be empty")
-	assert.Contains(suite.T(), err.Error(), "Kafka Consumer GroupId is required")
+	assert.Contains(suite.T(), err.Error(), "Kafka Consumer Auto offset is required")
+	assert.Contains(suite.T(), err.Error(), "Kafka Consumer Auto offset must either be 'earliest' or 'newest'")
 }
 
 func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesNotContainValidToml_THEN_errorIsReturned() {

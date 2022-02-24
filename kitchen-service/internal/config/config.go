@@ -39,7 +39,6 @@ func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DB
 		&validators.StringInclusion{Name: "Database SSL Mode", Field: config.db.sslMode, List: []string{"disable", "require", "verify-ca", "verify-full"}, Message: "Database SSL Mode is required"},
 		&validators.StringLengthInRange{Name: "Migration Directory", Field: config.db.host, Min: 1, Max: 0, Message: "Migration Directory path is required"},
 		&boostrapServersValidator{Name: "Bootstrap servers", Field: config.broker.boostrapServers},
-		&validators.StringLengthInRange{Name: "Kafka Consumer Group Id", Field: config.broker.consumerConfig.groupId, Min: 1, Max: 0, Message: "Kafka Consumer GroupId is required"},
 	)
 
 	if errors.HasAny() {
@@ -91,9 +90,20 @@ func readToml(bytes []byte) (*Config, error) {
 		}
 	}
 
-	err := toml.Unmarshal(bytes, &mutableConfig)
-	if err != nil {
+	var (
+		consumerConfig consumerConfig
+		err error
+	)
+
+	if err = toml.Unmarshal(bytes, &mutableConfig); err != nil {
 		return nil, fmt.Errorf("failed to parse config file. Reason: %w", err)
+	}
+
+	if consumerConfig, err = NewConsumerConfig(
+		mutableConfig.Broker.Consumer.GroupId,
+		mutableConfig.Broker.Consumer.AutoOffsetReset,
+	); err != nil{
+		return nil, fmt.Errorf("failed to create consumer config. Reason: %w", err)
 	}
 
 	return NewConfig(
@@ -107,10 +117,7 @@ func readToml(bytes []byte) (*Config, error) {
 		BrokerConfig{
 			boostrapServers:  mutableConfig.Broker.BootrstrapServers,
 			securityProtocol: mutableConfig.Broker.SecurityProtocol,
-			consumerConfig: NewConsumerConfig(
-				mutableConfig.Broker.Consumer.GroupId,
-				MustAutoOffsetReset(mutableConfig.Broker.Consumer.AutoOffsetReset),
-			),
+			consumerConfig: consumerConfig,
 			producerConfig: NewProducerConfig(),
 		},
 		DBConfig{

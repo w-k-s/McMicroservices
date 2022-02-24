@@ -3,6 +3,9 @@ package config
 import (
 	"fmt"
 	"strings"
+
+	"github.com/gobuffalo/validate"
+	"github.com/gobuffalo/validate/validators"
 )
 
 type BrokerConfig struct {
@@ -58,20 +61,29 @@ type consumerConfig struct {
 
 func MustAutoOffsetReset(autoOffsetReset string) AutoOffsetReset {
 	switch strings.ToLower(autoOffsetReset) {
-	case "earliest":
+	case string(Earliest):
 		return Earliest
-	case "newest":
+	case string(Newest):
 		return Newest
 	default:
 		panic(fmt.Sprintf("Unknown or unsupported autoOffsetReset value: %q", autoOffsetReset))
 	}
 }
 
-func NewConsumerConfig(groupId string, autoOffsetReset AutoOffsetReset) consumerConfig {
+func NewConsumerConfig(groupId string, autoOffsetReset string) (consumerConfig,error) {
+	errors := validate.Validate(
+		&validators.StringLengthInRange{Name: "Kafka Consumer Auto Offset", Field: autoOffsetReset, Min: 1, Max: 0, Message: "Kafka Consumer Auto offset is required"},
+		&validators.StringInclusion{Name: "Kafka Consumer Auto Offset", Field: autoOffsetReset, List: []string{"earliest","newest"}, Message: "Kafka Consumer Auto offset must either be 'earliest' or 'newest'"},
+	)
+
+	if errors.HasAny() {
+		return consumerConfig{}, errors
+	}
+
 	return consumerConfig{
 		groupId,
-		autoOffsetReset,
-	}
+		MustAutoOffsetReset(autoOffsetReset),
+	},nil
 }
 
 func (cc consumerConfig) GroupId() string {

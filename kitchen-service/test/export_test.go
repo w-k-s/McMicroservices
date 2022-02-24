@@ -82,10 +82,11 @@ func requestDatabaseTestContainer() cfg.DBConfig {
 }
 
 func requestKafkaTestContainer() cfg.BrokerConfig {
+	consumerConfig, _ := cfg.NewConsumerConfig("group_id", "earliest")
 	return cfg.NewBrokerConfig(
 		[]string{"localhost:9012"},
 		"plaintext",
-		cfg.NewConsumerConfig("group_id", "earliest"),
+		consumerConfig,
 	)
 }
 
