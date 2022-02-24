@@ -158,6 +158,10 @@ func Test_GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected(t *t
 			Value:     []byte(`{"id":1,"toppings":["Tomatoes","Onions","Mustard"]}`),
 		})
 
+	// THEN
+	// -- Wait for all expectations to be met
+	time.Sleep(30 * time.Second)
+
 	// TearDown
 	clearTables()
 	testApp.Close()
