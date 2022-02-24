@@ -44,4 +44,17 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    testLogging {
+        events(FAILED, STANDARD_ERROR, SKIPPED)
+        exceptionFormat = FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
+}
+
+// After Spring Boot v2.5.0, Spring Boot generates a order-service-0.0.1-plain.jar file
+// alongside the usual order-service-0.0.1.jar. This configuration disables generating the 'plain' jar
+tasks.getByName<Jar>("jar") {
+    enabled = false
 }
