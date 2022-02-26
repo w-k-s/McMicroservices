@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: app
+  name: config-service
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: config-service
+  template:
+    metadata:
+      labels:
+        app: config-service
+    spec:
+      containers:
+        - name: config-service
+          image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/config-service:7d16da28b22f6c0ef5af230a4b8c3edab4a4ad2c
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8888
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 60
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: app
+  name: config-service
+spec:
+  selector:
+    app: config-service
+  ports:
+    - port: 80
+      targetPort: 8888
+  type: ClusterIP

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: app
+  name: common-config
+data:
+  CONFIG_SERVER_URL: "http://config-service"

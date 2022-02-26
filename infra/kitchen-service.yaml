@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: app
+  name: kitchen-service
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: kitchen-service
+  template:
+    metadata:
+      labels:
+        app: kitchen-service
+    spec:
+      # TODO: add arguments (to download config from S3)
+      containers:
+        - name: kitchen-service
+          image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/kitchen-service:f0f42d3acaefffb022adcc16815a129782f399ba
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: app
+  name: kitchen-service
+spec:
+  selector:
+    app: kitchen-service
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
