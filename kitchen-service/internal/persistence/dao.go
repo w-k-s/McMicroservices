@@ -3,11 +3,11 @@ package persistence
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/cenkalti/backoff"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 )
 
@@ -74,7 +74,9 @@ func PingWithBackOff(db *sql.DB) error {
 	var ping backoff.Operation = func() error {
 		err := db.Ping()
 		if err != nil {
-			log.Printf("DB is not ready...backing off...: %s", err)
+			log.WithFields(map[string]interface{}{
+				"reason": err,
+			}).Print("DB is not ready...backing off...")
 			return err
 		}
 		return nil

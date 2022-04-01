@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	msg "github.com/w-k-s/McMicroservices/kitchen-service/internal/messages"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
@@ -67,6 +67,7 @@ type App struct {
 	producerFactory msg.ProducerFactory
 	mux             *mux.Router
 	pool            *sql.DB
+	logger          log.Logger
 }
 
 func (app *App) Config() *cfg.Config {
@@ -77,23 +78,31 @@ func newApp(b *appBuilder) (*App, error) {
 	if b.config == nil {
 		return nil, fmt.Errorf("configuration is required. Got %v", nil)
 	}
+	logger, err := cfg.ConfigureLogging()
+	if err != nil {
+		return nil, err
+	}
 
 	pool := db.MustOpenPool(b.config.Database())
 	db.MustRunMigrations(pool, b.config.Database())
 
+	mux := mux.NewRouter()
+	mux.Use(loggingMiddleware(logger))
+
 	app := &App{
 		config:          b.config,
-		mux:             mux.NewRouter(),
+		mux:             mux,
 		consumerFactory: b.GetConsumerFactory(),
 		producerFactory: b.GetProducerFactory(),
 		pool:            pool,
+		logger:          logger,
 	}
 
 	app.registerHealthEndpoint()
 	app.registerStockEndpoint()
 	app.registerOrderEndpoint()
 
-	log.Printf("--- Application Initialized ---")
+	logger.Printf("--- Application Initialized ---")
 	return app, nil
 }
 
@@ -115,7 +124,7 @@ func (app *App) ListenAndServe() {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			log.Printf("Error while listening and serving. Details: %s", err)
+			app.logger.Printf("Error while listening and serving. Details: %s", err)
 		}
 	}()
 
@@ -129,7 +138,7 @@ func (app *App) ListenAndServe() {
 	ctx, cancel := context.WithTimeout(context.Background(), app.config.Server().ShutdownGracePeriod())
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log.Printf("Failed to shut down server gracefully in %s", app.config.Server().ShutdownGracePeriod())
+		app.logger.Printf("Failed to shut down server gracefully in %s", app.config.Server().ShutdownGracePeriod())
 	}
 }
 
@@ -140,18 +149,32 @@ func (app *App) Router() *mux.Router {
 func (app *App) Close() {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("Failed to close application. Reason: %v\n", r)
+			app.logger.Printf("Failed to close application. Reason: %v\n", r)
 		}
 	}()
 	if err := defaultOrderHandler.Close(); err != nil {
-		log.Printf("Error while closing order handler: %q", err)
+		app.logger.Printf("Error while closing order handler: %q", err)
 	}
 	if err := defaultStockHandler.Close(); err != nil {
-		log.Printf("Error while closing stock handler: %q", err)
+		app.logger.Printf("Error while closing stock handler: %q", err)
 	}
 	if err := app.pool.Close(); err != nil {
-		log.Printf("Failed to close connection pool. Reason: %q", err.Error())
+		app.logger.Printf("Failed to close connection pool. Reason: %q", err.Error())
 	}
+}
+
+func loggingMiddleware(logger log.Logger) mux.MiddlewareFunc {
+	return mux.MiddlewareFunc(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			req := r.WithContext(logger.
+				WithFields(map[string]interface{}{
+					"TraceId": "TODO",
+				}).
+				WithContext(r.Context()),
+			)
+			next.ServeHTTP(w, req)
+		})
+	})
 }
 
 func (app *App) registerHealthEndpoint() {

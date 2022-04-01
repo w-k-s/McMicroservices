@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
 	toml "github.com/pelletier/go-toml/v2"
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -92,7 +92,7 @@ func readToml(bytes []byte) (*Config, error) {
 
 	var (
 		consumerConfig consumerConfig
-		err error
+		err            error
 	)
 
 	if err = toml.Unmarshal(bytes, &mutableConfig); err != nil {
@@ -102,7 +102,7 @@ func readToml(bytes []byte) (*Config, error) {
 	if consumerConfig, err = NewConsumerConfig(
 		mutableConfig.Broker.Consumer.GroupId,
 		mutableConfig.Broker.Consumer.AutoOffsetReset,
-	); err != nil{
+	); err != nil {
 		return nil, fmt.Errorf("failed to create consumer config. Reason: %w", err)
 	}
 
@@ -117,8 +117,8 @@ func readToml(bytes []byte) (*Config, error) {
 		BrokerConfig{
 			boostrapServers:  mutableConfig.Broker.BootrstrapServers,
 			securityProtocol: mutableConfig.Broker.SecurityProtocol,
-			consumerConfig: consumerConfig,
-			producerConfig: NewProducerConfig(),
+			consumerConfig:   consumerConfig,
+			producerConfig:   NewProducerConfig(),
 		},
 		DBConfig{
 			username:     mutableConfig.Database.Username,
@@ -155,7 +155,7 @@ func defaultLogsDirectoryPath() string {
 func mustUserHomeDir() string {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("Unable to access user's home directory")
+		log.Fatal("Unable to access user's home directory")
 	}
 	return homeDir
 }
@@ -201,15 +201,15 @@ func Must(config *Config, err error) *Config {
 	return config
 }
 
-func ConfigureLogging() error {
+func ConfigureLogging() (log.Logger, error) {
 	var err error
 	path := filepath.Join(defaultLogsDirectoryPath(), "server.log")
 	if err = os.MkdirAll(filepath.Dir(path), 0777); err != nil {
-		return fmt.Errorf("failed to create temporary directory %q. Reason: %w", path, err)
+		return nil, fmt.Errorf("failed to create temporary directory %q. Reason: %w", path, err)
 	}
 
 	if _, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666); err != nil {
-		return fmt.Errorf("failed to open log file. Reason: %w", err)
+		return nil, fmt.Errorf("failed to open log file. Reason: %w", err)
 	}
 	lumberjackLogger := &lumberjack.Logger{
 		Filename:   path,
@@ -218,11 +218,9 @@ func ConfigureLogging() error {
 		MaxAge:     30,   // days
 		Compress:   true, // disabled by default
 	}
-
 	multiWriter := io.MultiWriter(os.Stderr, lumberjackLogger)
-	log.SetOutput(multiWriter)
 
-	return nil
+	return log.NewLogger(multiWriter), nil
 }
 
 type boostrapServersValidator struct {

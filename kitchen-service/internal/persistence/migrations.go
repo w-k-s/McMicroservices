@@ -3,7 +3,6 @@ package persistence
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -11,6 +10,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/lib/pq"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 )
 
 func RunMigrations(db *sql.DB, dbConfig cfg.DBConfig) error {
@@ -49,5 +49,5 @@ func MustRunMigrations(pool *sql.DB, dbConfig cfg.DBConfig) {
 	if err := RunMigrations(pool, dbConfig); err != nil {
 		log.Fatalf("Failed to run migrations. Reason: %s", err)
 	}
-	log.Printf("Migrations applied")
+	log.Print("Migrations applied")
 }

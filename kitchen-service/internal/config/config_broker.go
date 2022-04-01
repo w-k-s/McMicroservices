@@ -70,10 +70,10 @@ func MustAutoOffsetReset(autoOffsetReset string) AutoOffsetReset {
 	}
 }
 
-func NewConsumerConfig(groupId string, autoOffsetReset string) (consumerConfig,error) {
+func NewConsumerConfig(groupId string, autoOffsetReset string) (consumerConfig, error) {
 	errors := validate.Validate(
 		&validators.StringLengthInRange{Name: "Kafka Consumer Auto Offset", Field: autoOffsetReset, Min: 1, Max: 0, Message: "Kafka Consumer Auto offset is required"},
-		&validators.StringInclusion{Name: "Kafka Consumer Auto Offset", Field: autoOffsetReset, List: []string{"earliest","newest"}, Message: "Kafka Consumer Auto offset must either be 'earliest' or 'newest'"},
+		&validators.StringInclusion{Name: "Kafka Consumer Auto Offset", Field: autoOffsetReset, List: []string{"earliest", "newest"}, Message: "Kafka Consumer Auto offset must either be 'earliest' or 'newest'"},
 	)
 
 	if errors.HasAny() {
@@ -83,7 +83,7 @@ func NewConsumerConfig(groupId string, autoOffsetReset string) (consumerConfig,e
 	return consumerConfig{
 		groupId,
 		MustAutoOffsetReset(autoOffsetReset),
-	},nil
+	}, nil
 }
 
 func (cc consumerConfig) GroupId() string {
