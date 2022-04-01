@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type ctxKey struct{}
 type Logger interface {
 	WithContext(ctx context.Context) context.Context
 	WithFields(map[string]interface{}) Logger
