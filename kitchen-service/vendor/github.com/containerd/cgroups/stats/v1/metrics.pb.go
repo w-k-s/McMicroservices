@@ -25,18 +25,18 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 type Metrics struct {
-	Hugetlb              []*HugetlbStat    `protobuf:"bytes,1,rep,name=hugetlb,proto3" json:"hugetlb,omitempty"`
-	Pids                 *PidsStat         `protobuf:"bytes,2,opt,name=pids,proto3" json:"pids,omitempty"`
-	CPU                  *CPUStat          `protobuf:"bytes,3,opt,name=cpu,proto3" json:"cpu,omitempty"`
-	Memory               *MemoryStat       `protobuf:"bytes,4,opt,name=memory,proto3" json:"memory,omitempty"`
-	Blkio                *BlkIOStat        `protobuf:"bytes,5,opt,name=blkio,proto3" json:"blkio,omitempty"`
-	Rdma                 *RdmaStat         `protobuf:"bytes,6,opt,name=rdma,proto3" json:"rdma,omitempty"`
-	Network              []*NetworkStat    `protobuf:"bytes,7,rep,name=network,proto3" json:"network,omitempty"`
-	CgroupStats          *CgroupStats      `protobuf:"bytes,8,opt,name=cgroup_stats,json=cgroupStats,proto3" json:"cgroup_stats,omitempty"`
+	Hugetlb              []*HugetlbStat `protobuf:"bytes,1,rep,name=hugetlb,proto3" json:"hugetlb,omitempty"`
+	Pids                 *PidsStat      `protobuf:"bytes,2,opt,name=pids,proto3" json:"pids,omitempty"`
+	CPU                  *CPUStat       `protobuf:"bytes,3,opt,name=cpu,proto3" json:"cpu,omitempty"`
+	Memory               *MemoryStat    `protobuf:"bytes,4,opt,name=memory,proto3" json:"memory,omitempty"`
+	Blkio                *BlkIOStat     `protobuf:"bytes,5,opt,name=blkio,proto3" json:"blkio,omitempty"`
+	Rdma                 *RdmaStat      `protobuf:"bytes,6,opt,name=rdma,proto3" json:"rdma,omitempty"`
+	Network              []*NetworkStat `protobuf:"bytes,7,rep,name=network,proto3" json:"network,omitempty"`
+	CgroupStats          *CgroupStats   `protobuf:"bytes,8,opt,name=cgroup_stats,json=cgroupStats,proto3" json:"cgroup_stats,omitempty"`
 	MemoryOomControl     *MemoryOomControl `protobuf:"bytes,9,opt,name=memory_oom_control,json=MemoryOomControl,proto3" json:"memory_oom_control,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}          `json:"-"`
-	XXX_unrecognized     []byte            `json:"-"`
-	XXX_sizecache        int32             `json:"-"`
+	XXX_NoUnkeyedLiteral struct{}       `json:"-"`
+	XXX_unrecognized     []byte         `json:"-"`
+	XXX_sizecache        int32          `json:"-"`
 }
 
 func (m *Metrics) Reset()      { *m = Metrics{} }
@@ -394,15 +394,15 @@ func (m *MemoryEntry) XXX_DiscardUnknown() {
 var xxx_messageInfo_MemoryEntry proto.InternalMessageInfo
 
 type MemoryOomControl struct {
-	OomKillDisable       uint64   `protobuf:"varint,1,opt,name=oom_kill_disable,proto3" json:oom_kill_disable",omitempty"`
-	UnderOom             uint64   `protobuf:"varint,2,opt,name=under_oom,proto3" json:"under_oom,omitempty"`
-	OomKill              uint64   `protobuf:"varint,3,opt,name=oom_kill,proto3" json:"oom_kill,omitempty"`
+	OomKillDisable   uint64   `protobuf:"varint,1,opt,name=oom_kill_disable,proto3" json:oom_kill_disable",omitempty"`
+	UnderOom         uint64   `protobuf:"varint,2,opt,name=under_oom,proto3" json:"under_oom,omitempty"`
+	OomKill          uint64   `protobuf:"varint,3,opt,name=oom_kill,proto3" json:"oom_kill,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
 }
 
-func (m *MemoryOomControl) Reset()      { *m = MemoryOomControl{} }
+func (m *MemoryOomControl) Reset()  { *m = MemoryOomControl{} }
 func (*MemoryOomControl) ProtoMessage() {}
 func (*MemoryOomControl) Descriptor() ([]byte, []int) {
 	return fileDescriptor_a17b2d87c332bfaa, []int{8}

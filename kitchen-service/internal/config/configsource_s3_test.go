@@ -125,7 +125,7 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriWithoutKey_WHEN_parseIsCalled_TH
 
 	// THEN
 	assert.NotNil(suite.T(), err)
-	assert.Nil(suite.T(), s3Uri)
+	assert.Equal(suite.T(), S3Uri{}, s3Uri)
 	assert.Equal(suite.T(), "failed to parse S3 URI. Not enough parts to extract bucket name and object key", err.Error())
 }
 
@@ -139,7 +139,7 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesNo
 	// THEN
 	assert.NotNil(suite.T(), err)
 	assert.Nil(suite.T(), config)
-	assert.Equal(suite.T(), "failed to download file from s3 uri \"s3://com.wks.mcmicroservices.kitchenservice/toast/config.yml\". Reason: [NoSuchKey]: The specified key does not exist.", err.Error())
+	assert.Contains(suite.T(), err.Error(), "failed to load config. Reason: 'failed to download file from s3://com.wks.mcmicroservices.kitchenservice/toast/config.yml. Reason: NoSuchKey: The specified key does not exist.")
 }
 
 func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesExistAtProvidedPath_THEN_configsParsedCorrectly() {
@@ -195,5 +195,5 @@ func (suite *ConfigS3TestSuite) Test_GIVEN_s3UriIsProvided_WHEN_configFileDoesNo
 	// THEN
 	assert.NotNil(suite.T(), err)
 	assert.Nil(suite.T(), config)
-	assert.Equal(suite.T(), "failed to parse config file. Reason: toml: invalid character at start of key: {", err.Error())
+	assert.Equal(suite.T(), "failed to load config. Reason: 'Near line 1 (last key parsed ''): expected '.' or '=', but got '{' instead'", err.Error())
 }

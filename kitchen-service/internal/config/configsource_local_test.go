@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -36,16 +35,15 @@ host     = "localhost"
 port     = 5432
 sslmode  = "disable"
 
-[[broker]]
+[broker]
 bootstrap_servers = ["localhost"]
 
-[[broker.consumer]]
+[broker.consumer]
 group_id = "group_id"
 auto_offset_reset = "earliest"
 `
 
-func createTestConfigFile(content string, uri string) error {
-	path := strings.Replace(uri, "file://", "", 1)
+func createTestConfigFile(content string, path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0777); err != nil {
 		return fmt.Errorf("Failed to create path '%s'. Reason: %w", path, err)
 	}
@@ -64,7 +62,7 @@ func (suite *ConfigTestSuite) SetupTest() {
 // -- TEARDOWN
 
 func (suite *ConfigTestSuite) TearDownTest() {
-	path := strings.Replace(DefaultConfigFilePath(), "file://", "", 1)
+	path := DefaultConfigFilePath()
 	_ = os.Remove(path)
 }
 
@@ -99,8 +97,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_loadin
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_configFileDoesNotExistAtDefaultPath_THEN_errorIsReturned() {
 	// GIVEN
-	path := strings.Replace(DefaultConfigFilePath(), "file://", "", 1)
-	_ = os.Remove(path)
+	_ = os.Remove(DefaultConfigFilePath())
 
 	// WHEN
 	config, err := LoadConfig("", "", "", "")
@@ -108,20 +105,20 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotProvided_WHEN_config
 	// THEN
 	assert.Nil(suite.T(), config)
 	assert.NotNil(suite.T(), err)
-	assert.Equal(suite.T(), fmt.Sprintf("failed to read config file from local path '%s'. Reason: open %s: no such file or directory", path, path), err.Error())
+	assert.Equal(suite.T(), fmt.Sprintf("failed to load config file from local path '%s'. Reason: open %s: no such file or directory", DefaultConfigFilePath(), DefaultConfigFilePath()), err.Error())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileDoesNotExistAtProvidedPath_THEN_errorIsReturned() {
 	// GIVEN
-	uri := "file://" + filepath.Join("/.kitchen", "test.d", "config.toml")
+	path := "file://" + filepath.Join("/.kitchen", "test.d", "config.toml")
 
 	// WHEN
-	config, err := LoadConfig(uri, "", "", "")
+	config, err := LoadConfig(path, "", "", "")
 
 	// THEN
 	assert.NotNil(suite.T(), err)
 	assert.Nil(suite.T(), config)
-	assert.Equal(suite.T(), "failed to read config file from local path '/.kitchen/test.d/config.toml'. Reason: open /.kitchen/test.d/config.toml: no such file or directory", err.Error())
+	assert.Equal(suite.T(), "failed to load config file from local path '/.kitchen/test.d/config.toml'. Reason: open /.kitchen/test.d/config.toml: no such file or directory", err.Error())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFileDoesExistAtProvidedPath_THEN_configsParsedCorrectly() {
@@ -142,11 +139,11 @@ host     = "localhost"
 port     = 5432
 sslmode  = "disable"
 
-[[broker]]
+[broker]
 bootstrap_servers = ["localhost"]
 security_protocol = "ssl"
 
-[[broker.consumer]]
+[broker.consumer]
 group_id = "group_id"
 auto_offset_reset = "earliest"
 `
@@ -206,7 +203,7 @@ func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsProvided_WHEN_configFil
 	// THEN
 	assert.NotNil(suite.T(), err)
 	assert.Nil(suite.T(), config)
-	assert.Equal(suite.T(), "failed to parse config file. Reason: toml: invalid character at start of key: {", err.Error())
+	assert.Equal(suite.T(), fmt.Sprintf("failed to load config file from local path '%s'. Reason: Near line 1 (last key parsed ''): expected '.' or '=', but got '{' instead", DefaultConfigFilePath()), err.Error())
 }
 
 func (suite *ConfigTestSuite) Test_GIVEN_configFilePathIsNotPrefixedWithFileOrS3Protocol_WHEN_configFileIsLoaded_THEN_errorIsReturned() {

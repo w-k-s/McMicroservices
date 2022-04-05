@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +10,8 @@ import (
 
 	"github.com/gobuffalo/validate"
 	"github.com/gobuffalo/validate/validators"
-	toml "github.com/pelletier/go-toml/v2"
 	"github.com/w-k-s/McMicroservices/kitchen-service/log"
+	"github.com/w-k-s/konfig"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
@@ -60,74 +59,41 @@ func (c Config) Broker() BrokerConfig {
 	return c.broker
 }
 
-func readToml(bytes []byte) (*Config, error) {
-	var mutableConfig struct {
-		Server struct {
-			Port                int
-			WriteTimeoutSeconds int64 `toml:"write_timeout"`
-			ReadTimeoutSeconds  int64 `toml:"read_timeout"`
-			MaxHeaderBytes      int   `toml:"max_header_bytes"`
-			ShutdownGracePeriod int64 `toml:"shutdown_grace_period"`
-		}
-		Database struct {
-			Username     string
-			Password     string
-			Host         string
-			Port         int
-			Name         string
-			SSLMode      string
-			MigrationDir string `toml:"migration_dir"`
-		}
-		Broker struct {
-			BootrstrapServers []string `toml:"bootstrap_servers"`
-			SecurityProtocol  string   `toml:"security_protocol"`
-			Consumer          struct {
-				GroupId         string `toml:"group_id"`
-				AutoOffsetReset string `toml:"auto_offset_reset"`
-			}
-			Producer struct {
-			}
-		}
-	}
-
+func readValues(store konfig.Store) (*Config, error) {
 	var (
 		consumerConfig consumerConfig
 		err            error
 	)
 
-	if err = toml.Unmarshal(bytes, &mutableConfig); err != nil {
-		return nil, fmt.Errorf("failed to parse config file. Reason: %w", err)
-	}
-
 	if consumerConfig, err = NewConsumerConfig(
-		mutableConfig.Broker.Consumer.GroupId,
-		mutableConfig.Broker.Consumer.AutoOffsetReset,
+		store.String("broker.consumer.group_id"),
+		store.String("broker.consumer.auto_offset_reset"),
 	); err != nil {
 		return nil, fmt.Errorf("failed to create consumer config. Reason: %w", err)
 	}
 
 	return NewConfig(
 		ServerConfig{
-			port:                mutableConfig.Server.Port,
-			readTimeout:         time.Duration(mutableConfig.Server.ReadTimeoutSeconds) * time.Second,
-			writeTimeout:        time.Duration(mutableConfig.Server.WriteTimeoutSeconds) * time.Second,
-			maxHeaderBytes:      mutableConfig.Server.MaxHeaderBytes,
-			shutdownGracePeriod: time.Duration(mutableConfig.Server.ShutdownGracePeriod) * time.Second,
+			port:                store.Int("server.port"),
+			readTimeout:         store.Duration("server.read_timeout") * time.Second,
+			writeTimeout:        store.Duration("server.write_timeout") * time.Second,
+			maxHeaderBytes:      store.Int("server.max_header_bytes"),
+			shutdownGracePeriod: store.Duration("server.shutdown_grace_period") * time.Second,
 		},
 		BrokerConfig{
-			boostrapServers:  mutableConfig.Broker.BootrstrapServers,
-			securityProtocol: mutableConfig.Broker.SecurityProtocol,
+			boostrapServers:  store.StringSlice("broker.bootstrap_servers"),
+			securityProtocol: store.String("broker.security_protocol"),
 			consumerConfig:   consumerConfig,
 			producerConfig:   NewProducerConfig(),
 		},
 		DBConfig{
-			username:     mutableConfig.Database.Username,
-			password:     mutableConfig.Database.Password,
-			host:         mutableConfig.Database.Host,
-			port:         mutableConfig.Database.Port,
-			name:         mutableConfig.Database.Name,
-			sslMode:      mutableConfig.Database.SSLMode,
-			migrationDir: mutableConfig.Database.MigrationDir,
+			username:     store.String("database.username"),
+			password:     store.String("database.password"),
+			host:         store.String("database.host"),
+			port:         store.Int("database.port"),
+			name:         store.String("database.name"),
+			sslMode:      store.String("database.sslmode"),
+			migrationDir: store.String("database.migration_dir"),
 		},
 	)
 }
@@ -137,15 +103,15 @@ func DefaultApplicationRootDirectory() string {
 }
 
 func DefaultConfigFilePath() string {
-	return "file://" + filepath.Join(DefaultApplicationRootDirectory(), "config.toml")
+	return filepath.Join(DefaultApplicationRootDirectory(), "config.toml")
 }
 
 func DefaultMigrationsDirectoryPath() string {
-	return "file://" + filepath.Join(DefaultApplicationRootDirectory(), "migrations")
+	return filepath.Join(DefaultApplicationRootDirectory(), "migrations")
 }
 
 func defaultTempDirectoryPath() string {
-	return "file://" + filepath.Join(DefaultApplicationRootDirectory(), "temporary")
+	return filepath.Join(DefaultApplicationRootDirectory(), "temporary")
 }
 
 func defaultLogsDirectoryPath() string {
@@ -160,24 +126,14 @@ func mustUserHomeDir() string {
 	return homeDir
 }
 
-type localConfigSource struct{}
-
-func (l localConfigSource) Load(configFilePath string) (*Config, error) {
-	localPath := strings.Replace(configFilePath, "file://", "", 1)
-	bytes, err := ioutil.ReadFile(localPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file from local path '%s'. Reason: %w", localPath, err)
-	}
-	return readToml(bytes)
-}
-
 func LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion string) (*Config, error) {
 	if len(configFilePath) == 0 {
-		configFilePath = DefaultConfigFilePath()
+		configFilePath = "file://" + DefaultConfigFilePath()
 	}
 
 	if strings.HasPrefix(configFilePath, "file://") {
-		return localConfigSource{}.Load(configFilePath)
+		absolutePath := strings.Replace(configFilePath, "file://", "", 1)
+		return localConfigSource{}.Load(absolutePath)
 	}
 
 	if strings.HasPrefix(configFilePath, "s3://") {

@@ -34,7 +34,7 @@ func RunMigrations(db *sql.DB, dbConfig cfg.DBConfig) error {
 		return fmt.Errorf("failed to create instance of psql driver. Reason: %w", err)
 	}
 
-	if migrations, err = migrate.NewWithDatabaseInstance(migrationsDirectory, driverName, driver); err != nil {
+	if migrations, err = migrate.NewWithDatabaseInstance("file://"+migrationsDirectory, driverName, driver); err != nil {
 		return fmt.Errorf("failed to load migrations from %s. Reason: %w", migrationsDirectory, err)
 	}
 
