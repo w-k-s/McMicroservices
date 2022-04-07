@@ -120,7 +120,7 @@ func Test_GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected(t *t
 
 	// GIVEN
 	testProducer.ExpectSendMessageWithCheckerFunctionAndSucceed(func(body []byte) error {
-		expected := "{\"id\":1,\"status\":\"FAILED\",\"reason\":\"Insufficient stock of \\\"Tomatoes\\\"\"}"
+		expected := "{\"id\":1,\"status\":\"FAILED\",\"reason\":\"insufficient stock of \\\"Tomatoes\\\"\"}"
 		actual := string(body)
 		if expected != actual {
 			return fmt.Errorf("Expected %q. Got %q", expected, actual)

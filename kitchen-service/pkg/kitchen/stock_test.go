@@ -33,8 +33,7 @@ func (suite *StockTestSuite) Test_GIVEN_aBlankNameAndPositiveQuantity_WHEN_stock
 
 	// THEN
 	assert.NotNil(suite.T(), err)
-	assert.Equal(suite.T(), ErrInvalidStockItem, err.(Error).Code())
-	assert.Equal(suite.T(), "Name must be 1 and 25 characters long", err.(Error).Error())
+	assert.Equal(suite.T(), "Invalid stock item. Name must be 1 and 25 characters long", err.Error())
 }
 
 func (suite *StockTestSuite) Test_GIVEN_aValidNameAndZeroQuantity_WHEN_stockItemIsCreated_THEN_errorIsReturned() {
@@ -43,6 +42,5 @@ func (suite *StockTestSuite) Test_GIVEN_aValidNameAndZeroQuantity_WHEN_stockItem
 
 	// THEN
 	assert.NotNil(suite.T(), err)
-	assert.Equal(suite.T(), ErrInvalidStockItem, err.(Error).Code())
-	assert.Equal(suite.T(), "Units must be greater than 0", err.(Error).Error())
+	assert.Equal(suite.T(), "Invalid stock item. Units must be greater than 0", err.Error())
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	"schneider.vip/problem"
@@ -26,7 +27,7 @@ func (h Handler) DecodeJsonOrSendBadRequest(w http.ResponseWriter, req *http.Req
 	decoder := json.NewDecoder(req.Body)
 	decoder.UseNumber()
 	if err := decoder.Decode(v); err != nil {
-		h.MustEncodeProblem(w, req, k.NewError(k.ErrUnmarshalling, "Failed to parse request", err))
+		h.MustEncodeProblem(w, req, k.InvalidError{Cause: fmt.Errorf("failed to parse request. Reason: %w", err)})
 		return false
 	}
 	return true
@@ -36,25 +37,18 @@ func (h Handler) MustEncodeProblem(w http.ResponseWriter, req *http.Request, err
 
 	log.Printf("Error: %s", err.Error())
 
-	title := k.ErrUnknown.Name()
-	code := k.ErrUnknown
+	title := errorTitle(err)
+	code := url.QueryEscape(title)
 	detail := err.Error()
 	opts := []problem.Option{}
-	status := k.ErrUnknown.Status()
+	status := httpStatus(err)
 
-	if coreError, ok := err.(k.Error); ok {
-		title = coreError.Code().Name()
-		code = coreError.Code()
-		detail = coreError.Error()
-		status = coreError.Code().Status()
-
-		for key, value := range coreError.Fields() {
-			opts = append(opts, problem.Custom(key, value))
-		}
+	for key, value := range errorFields(err) {
+		opts = append(opts, problem.Custom(key, value))
 	}
 
 	if _, problemError := problem.New(
-		problem.Type(fmt.Sprintf("/api/v1/problems/%d", code)),
+		problem.Type(fmt.Sprintf("/api/v1/problems/%s", code)),
 		problem.Status(status),
 		problem.Instance(req.URL.Path),
 		problem.Title(title),
@@ -64,6 +58,44 @@ func (h Handler) MustEncodeProblem(w http.ResponseWriter, req *http.Request, err
 		WriteTo(w); problemError != nil {
 		log.Printf("Failed to encode problem '%v'. Reason: %s", err, problemError)
 	}
+}
+
+func httpStatus(err error) int{
+	if isInvalid(err){
+		return 400
+	} else {
+		return 500
+	}
+}
+
+func errorTitle(err error) string{
+	type hasErrorTitle interface{
+		ErrorTitle() string
+	}
+	if titledError, ok := err.(hasErrorTitle); ok{
+		return titledError.ErrorTitle()
+	}
+	return ""
+}
+
+func isInvalid(err error) bool{
+	type hasInvalidFields interface{
+		InvalidFields() map[string]string
+	}
+	if _, ok := err.(hasInvalidFields); ok{
+		return true
+	}
+	return false
+}
+
+func errorFields(err error) map[string]string{
+	type hasInvalidFields interface{
+		InvalidFields() map[string]string
+	}
+	if fieldsError, ok := err.(hasInvalidFields); ok{
+		return fieldsError.InvalidFields()
+	}
+	return map[string]string{}
 }
 
 func (h Handler) MustMarshal(result []byte, err error) []byte {

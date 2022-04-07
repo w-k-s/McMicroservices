@@ -14,12 +14,12 @@ type Dao interface {
 }
 
 type StockDao interface {
-	BeginTx() (*sql.Tx, k.Error)
+	BeginTx() (*sql.Tx, error)
 	MustBeginTx() *sql.Tx
 
-	Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error
-	Decrease(ctx context.Context, tx *sql.Tx, decrease k.Stock) k.Error
-	Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error)
+	Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) error
+	Decrease(ctx context.Context, tx *sql.Tx, decrease k.Stock) error
+	Get(ctx context.Context, tx *sql.Tx) (k.Stock, error)
 }
 
 func DeferRollback(tx *sql.Tx, reference string) {
@@ -31,12 +31,12 @@ func DeferRollback(tx *sql.Tx, reference string) {
 	}
 }
 
-func Commit(tx *sql.Tx) k.Error {
+func Commit(tx *sql.Tx) error {
 	if tx == nil {
 		log.Fatal("Commit should not be passed a nil transaction")
 	}
 	if err := tx.Commit(); err != nil && err != sql.ErrTxDone {
-		return k.NewError(k.ErrDatabaseConnectivity, "Failed to save changes", err)
+		return k.NewSystemError("failed to save changes", err)
 	}
 	return nil
 }

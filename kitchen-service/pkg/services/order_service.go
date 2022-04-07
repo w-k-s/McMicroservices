@@ -66,7 +66,7 @@ func MustOrderService(stockDao db.StockDao) OrderService {
 func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error) {
 	var (
 		tx  *sql.Tx
-		err k.Error
+		err error
 	)
 
 	log.Printf("Processing order %d: %q", req.OrderId, req.Toppings)

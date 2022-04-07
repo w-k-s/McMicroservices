@@ -2,122 +2,49 @@ package kitchen
 
 import (
 	"fmt"
-	"log"
-	"net/http"
 	"sort"
 	"strings"
 
 	"github.com/gobuffalo/validate"
 )
 
-type ErrorCode uint64
-
-const (
-	ErrUnknown ErrorCode = iota + 2000
-	ErrDatabaseConnectivity
-	ErrDatabaseState
-	ErrUnmarshalling
-	ErrMarshalling
-
-	ErrInvalidStockItem
-
-	ErrInsufficientStock
-)
-
-var errorCodeNames = map[ErrorCode]string{
-	ErrUnknown:              "UNKOWN",
-	ErrDatabaseConnectivity: "DATABASE_CONNECTIVITY",
-	ErrDatabaseState:        "DATABASE_STATE",
-	ErrUnmarshalling:        "UNMARSHALLING",
-	ErrMarshalling:          "MARSHALLING",
-	ErrInvalidStockItem:     "INVALID_STOCK_ITEM",
-	ErrInsufficientStock:    "INSUFFICIENT_STOCK",
+type InvalidError struct{
+	Cause error
+	Fields map[string]string
 }
 
-func (c ErrorCode) Name() string {
-	var name string
-	var ok bool
-	if name, ok = errorCodeNames[c]; !ok {
-		log.Fatalf("FATAL: No name for error code %d", c)
+func (i InvalidError) Unwrap() error{
+	return i.Cause
+}
+
+func (i InvalidError) Error() string{
+
+	sb := strings.Builder{}
+	sb.WriteString(i.Cause.Error())
+
+	if len(i.Fields) > 0 {
+		fieldErrors := []string{}
+		for _, fieldError := range i.Fields {
+			fieldErrors = append(fieldErrors, fieldError)
+		}
+		sort.Strings(fieldErrors)
+		
+		sb.WriteString(". ")
+		sb.WriteString(strings.Join(fieldErrors, ", "))
 	}
-	return name
+
+	return sb.String()
 }
 
-func (c ErrorCode) Status() int {
-	switch c {
-	case ErrInvalidStockItem:
-		fallthrough
-	case ErrUnmarshalling:
-		fallthrough
-	case ErrInsufficientStock:
-		return http.StatusBadRequest
-
-	case ErrDatabaseConnectivity:
-		fallthrough
-	case ErrDatabaseState:
-		fallthrough
-	case ErrMarshalling:
-		fallthrough
-	case ErrUnknown:
-		fallthrough
-	default:
-		return http.StatusInternalServerError
-	}
+func (i InvalidError) ErrorTitle() string{
+	return "Invalid Request"
 }
 
-type Error interface {
-	Code() ErrorCode
-	Cause() error
-	Error() string
-	Fields() map[string]string
+func (i InvalidError) InvalidFields() map[string]string{
+	return i.Fields
 }
 
-type internalError struct {
-	code    ErrorCode
-	cause   error
-	message string
-	fields  map[string]string
-}
-
-func (e internalError) Code() ErrorCode {
-	return e.code
-}
-
-func (e internalError) Cause() error {
-	return e.cause
-}
-
-func (e internalError) Error() string {
-	return e.message
-}
-
-func (e internalError) Fields() map[string]string {
-	return e.fields
-}
-
-func (e internalError) String() string {
-	return e.cause.Error()
-}
-
-func NewError(code ErrorCode, message string, cause error) Error {
-	return &internalError{
-		code:    code,
-		cause:   fmt.Errorf("%s. Reason: '%w'", message, cause),
-		message: message,
-		fields:  map[string]string{},
-	}
-}
-
-func NewErrorWithFields(code ErrorCode, message string, cause error, fields map[string]string) Error {
-	return &internalError{
-		code:    code,
-		cause:   fmt.Errorf("%w", cause),
-		message: message,
-		fields:  fields,
-	}
-}
-
-func makeCoreValidationError(code ErrorCode, errors *validate.Errors) Error {
+func invalidErrorWithFields(message string, errors *validate.Errors) error{
 	if !errors.HasAny() {
 		return nil
 	}
@@ -127,12 +54,29 @@ func makeCoreValidationError(code ErrorCode, errors *validate.Errors) Error {
 		flatErrors[field] = strings.Join(violations, ", ")
 	}
 
-	listErrors := []string{}
-	for _, violations := range flatErrors {
-		listErrors = append(listErrors, violations)
-	}
-	sort.Strings(listErrors)
+	return InvalidError{Cause: fmt.Errorf(message), Fields: flatErrors}
+}
 
-	return NewErrorWithFields(code, strings.Join(listErrors, ", "), nil,
-		flatErrors)
+type SystemError struct{
+	Cause error
+}
+
+func NewSystemError(message string, cause error) error{
+	return SystemError{Cause: fmt.Errorf("%s. Reason: %w", message, cause)}
+}
+
+func (s SystemError) Unwrap() error{
+	return s.Cause
+}
+
+func (s SystemError) Error() string{
+	return s.Cause.Error()
+}
+
+func (s SystemError) IsSystemError() bool{
+	return true
+}
+
+func (i SystemError) ErrorTitle() string{
+	return "System Error"
 }

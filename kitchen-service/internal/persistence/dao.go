@@ -46,14 +46,14 @@ func MustOpenPool(dbConfig cfg.DBConfig) *sql.DB {
 	return db
 }
 
-func (r *RootDao) BeginTx() (*sql.Tx, k.Error) {
+func (r *RootDao) BeginTx() (*sql.Tx, error) {
 	var (
 		tx  *sql.Tx
 		err error
 	)
 
 	if tx, err = r.pool.Begin(); err != nil {
-		return nil, k.NewError(k.ErrDatabaseState, "Failed to begin transaction", err)
+		return nil, k.NewSystemError("failed to begin transaction", err)
 	}
 	return tx, nil
 }

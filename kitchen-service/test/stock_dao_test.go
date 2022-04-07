@@ -140,6 +140,5 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvai
 	// THEN
 	assert.NotNil(suite.T(), err)
 
-	assert.Equal(suite.T(), k.ErrInsufficientStock, err.Code())
-	assert.Equal(suite.T(), "Insufficient stock of \"Cheese\"", err.Error())
+	assert.Equal(suite.T(), "insufficient stock of \"Cheese\"", err.Error())
 }

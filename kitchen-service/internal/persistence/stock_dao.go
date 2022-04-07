@@ -21,7 +21,7 @@ func MustOpenStockDao(pool *sql.DB) dao.StockDao {
 	return &defaultStockDao{&RootDao{pool}}
 }
 
-func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {
+func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) error {
 	var err error
 
 	for _, item := range stock {
@@ -47,14 +47,14 @@ func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock
 		)
 
 		if err != nil {
-			return k.NewError(k.ErrDatabaseState, fmt.Sprintf("Failed to increase stock of %q, Reason: %q", item.Name(), err.Error()), err)
+			return k.NewSystemError(fmt.Sprintf("Failed to increase stock of %q", item.Name()), err)
 		}
 	}
 
 	return nil
 }
 
-func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock) k.Error {
+func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock) error {
 	var (
 		res          sql.Result
 		rowsAffected int64
@@ -77,19 +77,19 @@ func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock
 		)
 
 		if err != nil {
-			return k.NewError(k.ErrDatabaseState, fmt.Sprintf("Failed to update stock of %q", item.Name()), err)
+			return k.NewSystemError(fmt.Sprintf("failed to update stock of %q", item.Name()), err)
 		}
 		if rowsAffected, err = res.RowsAffected(); err != nil {
-			return k.NewError(k.ErrDatabaseState, "Failed to get result of stock update", err)
+			return k.NewSystemError("failed to get result of stock update", err)
 		}
 		if rowsAffected == 0 {
-			return k.NewError(k.ErrInsufficientStock, fmt.Sprintf("Insufficient stock of %q", item.Name()), nil)
+			return k.InvalidError{Cause: fmt.Errorf("insufficient stock of %q", item.Name())}
 		}
 	}
 	return nil
 }
 
-func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error) {
+func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, error) {
 	var (
 		rows *sql.Rows
 		err  error
@@ -105,7 +105,7 @@ func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, k.Error)
 	)
 	if err != nil {
 		log.Printf("Failed to load stock. Reason: %q\n", err)
-		return nil, k.NewError(k.ErrDatabaseState, "Failed to load stock", err)
+		return nil, k.NewSystemError("Failed to load stock", err)
 	}
 	defer rows.Close()
 

@@ -30,8 +30,8 @@ type StockRequest struct {
 }
 
 type StockService interface {
-	GetStock(ctx context.Context) (StockResponse, k.Error)
-	ReceiveInventory(ctx context.Context, req StockRequest) k.Error
+	GetStock(ctx context.Context) (StockResponse, error)
+	ReceiveInventory(ctx context.Context, req StockRequest) error
 }
 
 type stockService struct {
@@ -59,11 +59,11 @@ func MustStockService(stockDao db.StockDao) StockService {
 	return svc
 }
 
-func (svc stockService) GetStock(ctx context.Context) (StockResponse, k.Error) {
+func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 	var (
 		stock k.Stock
 		tx    *sql.Tx
-		err   k.Error
+		err   error
 	)
 
 	tx, err = svc.stockDao.BeginTx()
@@ -91,10 +91,10 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, k.Error) {
 	return StockResponse{items}, nil
 }
 
-func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) k.Error {
+func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) error {
 	var (
 		tx  *sql.Tx
-		err k.Error
+		err error
 	)
 
 	tx, err = svc.stockDao.BeginTx()

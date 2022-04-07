@@ -18,14 +18,14 @@ type StockItemRecord interface {
 	Units() uint
 }
 
-func NewStockItem(name string, units uint) (StockItem, Error) {
+func NewStockItem(name string, units uint) (StockItem, error) {
 
 	errors := validate.Validate(
 		&validators.StringLengthInRange{Name: "Name", Field: name, Min: 1, Max: 25, Message: "Name must be 1 and 25 characters long"},
 		&validators.IntIsGreaterThan{Name: "Units", Field: int(units), Compared: 0, Message: "Units must be greater than 0"},
 	)
 
-	if err := makeCoreValidationError(ErrInvalidStockItem, errors); err != nil {
+	if err := invalidErrorWithFields("Invalid stock item", errors); err != nil {
 		return StockItem{}, err
 	}
 
@@ -35,7 +35,7 @@ func NewStockItem(name string, units uint) (StockItem, Error) {
 	}, nil
 }
 
-func Must(item StockItem, err Error) StockItem {
+func Must(item StockItem, err error) StockItem {
 	if err != nil {
 		log.Fatalf("Failed to create stock item. Reason: %q", err)
 	}

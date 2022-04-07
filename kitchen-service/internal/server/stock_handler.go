@@ -9,7 +9,6 @@ import (
 
 	"github.com/Shopify/sarama"
 
-	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
 )
 
@@ -108,14 +107,13 @@ func (s stockHandler) receiveInventory(ctx context.Context, request []byte) {
 	var (
 		receiveInventoryRequest svc.StockRequest
 		err                     error
-		kitchenError            k.Error
 	)
 	if err = decoder.Decode(&receiveInventoryRequest); err != nil {
 		log.Printf("Failed to decode inventory message %q. Reason: %q ", string(request), err)
 		return
 	}
 
-	if kitchenError = s.stockSvc.ReceiveInventory(ctx, receiveInventoryRequest); kitchenError != nil {
+	if err = s.stockSvc.ReceiveInventory(ctx, receiveInventoryRequest); err != nil {
 		log.Printf("Failed to update inventory with stock %q. Reason: %q ", receiveInventoryRequest.Stock, err)
 		return
 	}
