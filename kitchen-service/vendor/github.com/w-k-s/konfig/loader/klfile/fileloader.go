@@ -5,11 +5,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/lalamove/nui/nfs"
+	"github.com/lalamove/nui/nlogger"
 	"github.com/w-k-s/konfig"
 	"github.com/w-k-s/konfig/parser"
 	"github.com/w-k-s/konfig/watcher/kwfile"
-	"github.com/lalamove/nui/nfs"
-	"github.com/lalamove/nui/nlogger"
 )
 
 var (

@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/w-k-s/konfig"
 	"github.com/lalamove/nui/nlogger"
 	"github.com/radovskyb/watcher"
+	"github.com/w-k-s/konfig"
 )
 
 var _ konfig.Watcher = (*FileWatcher)(nil)

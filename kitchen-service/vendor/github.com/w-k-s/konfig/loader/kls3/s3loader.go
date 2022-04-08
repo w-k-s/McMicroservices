@@ -35,26 +35,26 @@ type Object struct {
 	// Bucket is the bucket of the file
 	Bucket string
 	// Name is the name of the object
-	Key string 
+	Key string
 	// Parser is the parser used to parse file and add it to the config store
 	Parser parser.Parser
 }
 
-func (o Object) Download(downloader Downloader) (io.Reader, error){
+func (o Object) Download(downloader Downloader) (io.Reader, error) {
 	buff := &aws.WriteAtBuffer{}
 	if _, err := downloader.Download(buff, &s3.GetObjectInput{
 		Bucket: aws.String(o.Bucket),
 		Key:    aws.String(o.Key),
-	}); err != nil{
-		return nil, fmt.Errorf("failed to download file from s3://%s/%s. Reason: %w", o.Bucket,o.Key, err)
+	}); err != nil {
+		return nil, fmt.Errorf("failed to download file from s3://%s/%s. Reason: %w", o.Bucket, o.Key, err)
 	}
-	return bytes.NewReader(buff.Bytes()),nil
+	return bytes.NewReader(buff.Bytes()), nil
 }
 
 // Downloader is the interface used to download objects from S3.
 // It is implemented by s3manager.Downloader.
 type Downloader interface {
-	Download(io.WriterAt, *s3.GetObjectInput, ...func(*s3manager.Downloader)) (int64,error)
+	Download(io.WriterAt, *s3.GetObjectInput, ...func(*s3manager.Downloader)) (int64, error)
 }
 
 var defaultDownloader = s3manager.NewDownloader(session.Must(session.NewSession()))
