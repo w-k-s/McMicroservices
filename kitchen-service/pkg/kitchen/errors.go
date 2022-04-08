@@ -8,16 +8,16 @@ import (
 	"github.com/gobuffalo/validate"
 )
 
-type InvalidError struct{
-	Cause error
+type InvalidError struct {
+	Cause  error
 	Fields map[string]string
 }
 
-func (i InvalidError) Unwrap() error{
+func (i InvalidError) Unwrap() error {
 	return i.Cause
 }
 
-func (i InvalidError) Error() string{
+func (i InvalidError) Error() string {
 
 	sb := strings.Builder{}
 	sb.WriteString(i.Cause.Error())
@@ -28,7 +28,7 @@ func (i InvalidError) Error() string{
 			fieldErrors = append(fieldErrors, fieldError)
 		}
 		sort.Strings(fieldErrors)
-		
+
 		sb.WriteString(". ")
 		sb.WriteString(strings.Join(fieldErrors, ", "))
 	}
@@ -36,15 +36,15 @@ func (i InvalidError) Error() string{
 	return sb.String()
 }
 
-func (i InvalidError) ErrorTitle() string{
+func (i InvalidError) ErrorTitle() string {
 	return "Invalid Request"
 }
 
-func (i InvalidError) InvalidFields() map[string]string{
+func (i InvalidError) InvalidFields() map[string]string {
 	return i.Fields
 }
 
-func invalidErrorWithFields(message string, errors *validate.Errors) error{
+func invalidErrorWithFields(message string, errors *validate.Errors) error {
 	if !errors.HasAny() {
 		return nil
 	}
@@ -57,26 +57,26 @@ func invalidErrorWithFields(message string, errors *validate.Errors) error{
 	return InvalidError{Cause: fmt.Errorf(message), Fields: flatErrors}
 }
 
-type SystemError struct{
+type SystemError struct {
 	Cause error
 }
 
-func NewSystemError(message string, cause error) error{
+func NewSystemError(message string, cause error) error {
 	return SystemError{Cause: fmt.Errorf("%s. Reason: %w", message, cause)}
 }
 
-func (s SystemError) Unwrap() error{
+func (s SystemError) Unwrap() error {
 	return s.Cause
 }
 
-func (s SystemError) Error() string{
+func (s SystemError) Error() string {
 	return s.Cause.Error()
 }
 
-func (s SystemError) IsSystemError() bool{
+func (s SystemError) IsSystemError() bool {
 	return true
 }
 
-func (i SystemError) ErrorTitle() string{
+func (i SystemError) ErrorTitle() string {
 	return "System Error"
 }

@@ -190,6 +190,7 @@ func (app *App) registerStockEndpoint() {
 	defaultStockHandler = NewStockHandler(
 		stockService,
 		msg.MustConsumer(app.consumerFactory(app.config.Broker())),
+		app.logger,
 	)
 
 	stockRouter := app.mux.PathPrefix("/kitchen/api/v1/stock").Subrouter()
@@ -204,5 +205,6 @@ func (app *App) registerOrderEndpoint() {
 		orderService,
 		msg.MustConsumer(app.consumerFactory(app.config.Broker())),
 		msg.MustProducer(app.producerFactory(app.config.Broker())),
+		app.logger,
 	)
 }

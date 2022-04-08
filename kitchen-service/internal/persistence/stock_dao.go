@@ -25,9 +25,9 @@ func (s *defaultStockDao) BeginTx() (dao.StockTx, error) {
 	return StockTx(s.pool.Begin())
 }
 
-func StockTx(tx *sql.Tx, err error) (dao.StockTx,error){
-	if err != nil{
-		return nil,k.NewSystemError("failed to begin transaction",err)
+func StockTx(tx *sql.Tx, err error) (dao.StockTx, error) {
+	if err != nil {
+		return nil, k.NewSystemError("failed to begin transaction", err)
 	}
 	return defaultStockTx{tx}, nil
 }

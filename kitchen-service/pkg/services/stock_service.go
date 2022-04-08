@@ -2,8 +2,9 @@ package services
 
 import (
 	"context"
-	"log"
 	"sort"
+
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"

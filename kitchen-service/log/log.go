@@ -3,6 +3,7 @@ package log
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -20,7 +21,13 @@ type Logger interface {
 
 type Event interface {
 	Str(key string, value string) Event
+	Int32(key string, value int32) Event
+	Int64(key string, value int64) Event
+	UInt64(key string, value uint64) Event
+	Duration(key string, value time.Duration) Event
+	Struct(key string, value interface{}) Event
 	Msg(msg string)
+	Msgf(format string, args ...interface{})
 }
 
 func NewLogger(w io.Writer) Logger {
@@ -32,6 +39,14 @@ func NewLogger(w io.Writer) Logger {
 
 func Info() Event {
 	return &internalLogEvent{log.Info()}
+}
+
+func InfoCtx(ctx context.Context) Event {
+	if logger := withLogger(ctx); logger != nil {
+		return logger.Info()
+	} else {
+		return Info()
+	}
 }
 
 func Err(err error) Event {
@@ -113,6 +128,30 @@ func (e *internalLogEvent) Str(key string, value string) Event {
 	return &internalLogEvent{e.e.Str(key, value)}
 }
 
+func (e *internalLogEvent) Int32(key string, value int32) Event {
+	return &internalLogEvent{e.e.Int32(key, value)}
+}
+
+func (e *internalLogEvent) Int64(key string, value int64) Event {
+	return &internalLogEvent{e.e.Int64(key, value)}
+}
+
+func (e *internalLogEvent) UInt64(key string, value uint64) Event {
+	return &internalLogEvent{e.e.Uint64(key, value)}
+}
+
+func (e *internalLogEvent) Duration(key string, value time.Duration) Event {
+	return &internalLogEvent{e.e.Dur(key, value)}
+}
+
+func (e *internalLogEvent) Struct(key string, value interface{}) Event {
+	return &internalLogEvent{e.e.Interface(key, value)}
+}
+
 func (e *internalLogEvent) Msg(msg string) {
 	e.e.Msg(msg)
+}
+
+func (e *internalLogEvent) Msgf(format string, args ...interface{}) {
+	e.e.Msgf(format, args)
 }

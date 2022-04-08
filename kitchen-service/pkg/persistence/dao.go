@@ -12,7 +12,7 @@ type StockDao interface {
 	BeginTx() (StockTx, error)
 }
 
-type Tx interface{
+type Tx interface {
 	Commit() error
 	Rollback() error
 }

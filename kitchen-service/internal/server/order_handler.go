@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
+
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 
 	"github.com/Shopify/sarama"
 	svc "github.com/w-k-s/McMicroservices/kitchen-service/pkg/services"
@@ -34,8 +35,10 @@ func NewOrderHandler(
 	orderService svc.OrderService,
 	consumer sarama.Consumer,
 	producer sarama.SyncProducer,
+	logger log.Logger,
 ) OrderHandler {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+	ctx, cancelFunc := context.WithCancel(logger.WithContext(context.Background()))
+	
 	orderHandler := &orderHandler{
 		orderService: orderService,
 		consumer:     consumer,
@@ -56,13 +59,14 @@ func (oh orderHandler) Close() error {
 }
 
 func (oh orderHandler) listenForNewOrderEvents(ctx context.Context) {
-	log.Printf("Listening for New Orders")
+	log.InfoCtx(ctx).Msg("Listening for New Orders")
+
 	var (
 		partitionList []int32
 		err           error
 	)
 	if partitionList, err = oh.consumer.Partitions(TopicCreateOrder); err != nil {
-		log.Printf("Failed to get partition list for stockHandler. Reason: %q", err)
+		log.ErrCtx(ctx, err).Msg("Failed to get partition list for stockHandler")
 		return
 	}
 
@@ -73,7 +77,13 @@ func (oh orderHandler) listenForNewOrderEvents(ctx context.Context) {
 	messageChannel := make(chan *sarama.ConsumerMessage)
 	for _, partition := range partitionList {
 		pc, _ := oh.consumer.ConsumePartition(TopicCreateOrder, partition, initialOffset)
-		log.Printf("Creating a comsumer for topic %q on partition '%d' with offset '%d'", TopicCreateOrder, partition, initialOffset)
+
+		log.InfoCtx(ctx).
+			Str("topic", TopicCreateOrder).
+			Int32("partition", partition).
+			Int64("offset", initialOffset).
+			Msgf("Creating a consumer")
+
 		go func(pc sarama.PartitionConsumer) {
 			for message := range pc.Messages() {
 				messageChannel <- message
@@ -88,7 +98,8 @@ func (oh orderHandler) listenForNewOrderEvents(ctx context.Context) {
 			case <-ctx.Done():
 				return // returning not to leak the goroutine
 			case message := <-messageChannel:
-				oh.publishResponse(oh.HandleOrderMessage(ctx, message.Value))
+				topic, reply := oh.HandleOrderMessage(ctx, message.Value)
+				oh.publishResponse(ctx, topic, reply)
 				continue
 			}
 		}
@@ -96,7 +107,9 @@ func (oh orderHandler) listenForNewOrderEvents(ctx context.Context) {
 }
 
 func (oh orderHandler) HandleOrderMessage(ctx context.Context, request []byte) (string, []byte) {
-	log.Printf("Order Message received: %q\n", string(request))
+	log.InfoCtx(ctx).
+		Str("message", string(request)).
+		Msgf("Order Message received")
 	decoder := json.NewDecoder(bytes.NewReader(request))
 	decoder.UseNumber()
 
@@ -107,7 +120,7 @@ func (oh orderHandler) HandleOrderMessage(ctx context.Context, request []byte) (
 	)
 	if err = decoder.Decode(&orderRequest); err != nil {
 		// TODO: This should probably go in to a failed-to-process queue
-		log.Printf("Failed to decode order request. Reason: %s", err)
+		log.ErrCtx(ctx, err).Msg("Failed to decode order request")
 		return "", []byte{}
 	}
 
@@ -117,7 +130,7 @@ func (oh orderHandler) HandleOrderMessage(ctx context.Context, request []byte) (
 	return TopicOrderReady, oh.MustMarshal(json.Marshal(orderResponse))
 }
 
-func (oh orderHandler) publishResponse(topic string, body []byte) {
+func (oh orderHandler) publishResponse(ctx context.Context, topic string, body []byte) {
 	var (
 		partition int32
 		offset    int64
@@ -128,8 +141,16 @@ func (oh orderHandler) publishResponse(topic string, body []byte) {
 		Value: sarama.StringEncoder(body),
 	}
 	if partition, offset, err = oh.producer.SendMessage(message); err != nil {
-		log.Printf("Failed to publish message %q to topic %q (partition: %d). Reason: %q", string(body), topic, -1, err)
+		log.ErrCtx(ctx, err).
+			Str("message", string(body)).
+			Str("topic", topic).
+			Msgf("Failed to publish message")
 		return
 	}
-	log.Printf("Message %q published to topic %q with partition %d and offset %d", string(body), topic, partition, offset)
+	log.InfoCtx(ctx).
+		Str("message", string(body)).
+		Str("topic", topic).
+		Int32("partition", partition).
+		Int64("offset", offset).
+		Msg("Message published")
 }

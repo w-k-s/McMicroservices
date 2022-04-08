@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
+
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 
 	"github.com/Shopify/sarama"
 
@@ -23,8 +24,8 @@ type stockHandler struct {
 	cancelFunc context.CancelFunc
 }
 
-func NewStockHandler(stockSvc svc.StockService, consumer sarama.Consumer) stockHandler {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+func NewStockHandler(stockSvc svc.StockService, consumer sarama.Consumer, logger log.Logger) stockHandler {
+	ctx, cancelFunc := context.WithCancel(logger.WithContext(context.Background()))
 	handler := stockHandler{
 		Handler{},
 		stockSvc,
@@ -67,7 +68,7 @@ func (s stockHandler) listenForStockDeliveryEvents(ctx context.Context) {
 		err           error
 	)
 	if partitionList, err = s.consumer.Partitions(TopicInventoryDelivery); err != nil {
-		log.Printf("Failed to get partition list for stockHandler. Reason: %q", err)
+		log.ErrCtx(ctx, err).Msg("Failed to get partition list for stockHandler")
 		return
 	}
 
@@ -100,7 +101,7 @@ func (s stockHandler) listenForStockDeliveryEvents(ctx context.Context) {
 }
 
 func (s stockHandler) receiveInventory(ctx context.Context, request []byte) {
-	log.Println("Inventory Received...")
+	log.InfoCtx(ctx).Msg("Inventory Received...")
 	decoder := json.NewDecoder(bytes.NewReader(request))
 	decoder.UseNumber()
 
@@ -109,15 +110,20 @@ func (s stockHandler) receiveInventory(ctx context.Context, request []byte) {
 		err                     error
 	)
 	if err = decoder.Decode(&receiveInventoryRequest); err != nil {
-		log.Printf("Failed to decode inventory message %q. Reason: %q ", string(request), err)
+		log.ErrCtx(ctx, err).
+			Str("message", string(request)).
+			Msg("Failed to decode inventory message")
 		return
 	}
 
 	if err = s.stockSvc.ReceiveInventory(ctx, receiveInventoryRequest); err != nil {
-		log.Printf("Failed to update inventory with stock %q. Reason: %q ", receiveInventoryRequest.Stock, err)
+		log.ErrCtx(ctx, err).
+			Str("request", string(request)).
+			Msg("Failed to update inventory with stock")
 		return
 	}
 
-	log.Printf("Inventory updated with stock %q", receiveInventoryRequest.Stock)
-	return
+	log.InfoCtx(ctx).
+		Str("request", string(request)).
+		Msg("Inventory updated with stock")
 }

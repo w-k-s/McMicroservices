@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 )
@@ -15,19 +16,11 @@ type healthHandler struct {
 	db *sql.DB
 }
 
-func NewHealthHandler(db *sql.DB) (healthHandler, error) {
-	if db == nil {
-		return healthHandler{}, fmt.Errorf("healthHandler received db: nil. non-nil db expected")
-	}
-	return healthHandler{Handler{}, db}, nil
-}
-
 func MustHealthHandler(db *sql.DB) healthHandler {
-	handler, err := NewHealthHandler(db)
-	if err != nil {
-		log.Fatal(err.Error())
+	if db == nil {
+		log.Fatalf("healthHandler received db: nil. non-nil db expected")
 	}
-	return handler
+	return healthHandler{Handler{}, db}
 }
 
 func (h healthHandler) CheckHealth(w http.ResponseWriter, req *http.Request) {

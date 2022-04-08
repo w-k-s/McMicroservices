@@ -2,8 +2,9 @@ package services
 
 import (
 	"context"
-	"log"
 	"time"
+
+	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/pkg/persistence"
@@ -56,7 +57,10 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 		err error
 	)
 
-	log.Printf("Processing order %d: %q", req.OrderId, req.Toppings)
+	log.InfoCtx(ctx).
+		UInt64("orderId", req.OrderId).
+		Struct("toppings", req.Toppings).
+		Msg("Processing order")
 
 	tx, err = svc.stockDao.BeginTx()
 	if err != nil {
@@ -80,17 +84,24 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 
 	err = tx.Decrease(ctx, stock)
 	if err != nil {
-		log.Printf("Error processing order %d. Reason: %q", req.OrderId, err.Error())
+		log.ErrCtx(ctx, err).
+			UInt64("orderId", req.OrderId).
+			Msg("Error processing order")
 		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 	}
 
 	if err = db.Commit(tx); err != nil {
-		log.Printf("Error committing stock for order %d. Reason: %q", req.OrderId, err.Error())
+		log.ErrCtx(ctx, err).
+			UInt64("orderId", req.OrderId).
+			Msg("Error committing stock")
 		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 	}
 
 	// Wait
-	log.Printf("Preparing order %d. PreparationTime: %q", req.OrderId, req.PreparationTime().String())
+	log.InfoCtx(ctx).
+		UInt64("orderId", req.OrderId).
+		Duration("PreparationTime", req.PreparationTime()).
+		Msg("Preparing order")
 	time.Sleep(req.PreparationTime())
 
 	return OrderResponse{req.OrderId, k.OrderStatusReady, ""}, nil

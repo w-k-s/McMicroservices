@@ -31,7 +31,7 @@ func Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSucces
 	)
 
 	// GIVEN
-	tx,_ := stockDao.BeginTx()
+	tx, _ := stockDao.BeginTx()
 	if err = tx.Increase(context.Background(), k.Stock{
 		k.Must(k.NewStockItem("Tomatoes", 2)),
 		k.Must(k.NewStockItem("Onions", 2)),

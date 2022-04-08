@@ -39,7 +39,7 @@ func (suite *StockDaoTestSuite) TearDownTest() {
 func (suite *StockDaoTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
 	// GIVEN
 	ctx := context.Background()
-	increaseTx,_ := suite.stockDao.BeginTx()
+	increaseTx, _ := suite.stockDao.BeginTx()
 
 	// WHEN
 	item1, _ := k.NewStockItem("Cheese", 5)
@@ -48,7 +48,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalS
 	assert.Nil(suite.T(), increaseTx.Commit(), "Commit returned error")
 
 	// THEN
-	getTx,_ := suite.stockDao.BeginTx()
+	getTx, _ := suite.stockDao.BeginTx()
 	stock, err := getTx.Get(ctx)
 	assert.Nil(suite.T(), getTx.Commit())
 	sort.Sort(stock)
@@ -63,7 +63,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_noStock_WHEN_stockIsAdded_THEN_totalS
 func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsAdded_THEN_totalStockIsCorrect() {
 	// GIVEN
 	ctx := context.Background()
-	givenTx,_ := suite.stockDao.BeginTx()
+	givenTx, _ := suite.stockDao.BeginTx()
 
 	item1, _ := k.NewStockItem("Cheese", 5)
 	item2, _ := k.NewStockItem("Donuts", 7)
@@ -71,14 +71,14 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsAdded_THEN_totalSto
 	assert.Nil(suite.T(), givenTx.Commit(), "Commit returned error")
 
 	// WHEN
-	increaseTx,_ := suite.stockDao.BeginTx()
+	increaseTx, _ := suite.stockDao.BeginTx()
 	item1Addition, _ := k.NewStockItem("Cheese", 5)
 	item2Addition, _ := k.NewStockItem("Donuts", 3)
 	assert.Nil(suite.T(), increaseTx.Increase(ctx, k.Stock{item1Addition, item2Addition}), "Increase returned error")
 	assert.Nil(suite.T(), increaseTx.Commit(), "Commit returned error")
 
 	// THEN
-	getTx,_ := suite.stockDao.BeginTx()
+	getTx, _ := suite.stockDao.BeginTx()
 	stock, err := getTx.Get(ctx)
 	assert.Nil(suite.T(), getTx.Commit())
 	sort.Sort(stock)
@@ -93,7 +93,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsAdded_THEN_totalSto
 func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreased_THEN_totalStockIsCorrect() {
 	// GIVEN
 	ctx := context.Background()
-	givenTx,_ := suite.stockDao.BeginTx()
+	givenTx, _ := suite.stockDao.BeginTx()
 
 	item1, _ := k.NewStockItem("Cheese", 5)
 	item2, _ := k.NewStockItem("Donuts", 7)
@@ -101,14 +101,14 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreased_THEN_tota
 	assert.Nil(suite.T(), givenTx.Commit(), "Commit returned error")
 
 	// WHEN
-	decreaseTx,_ := suite.stockDao.BeginTx()
+	decreaseTx, _ := suite.stockDao.BeginTx()
 	item1Decrease, _ := k.NewStockItem("Cheese", 4)
 	item2Decrease, _ := k.NewStockItem("Donuts", 2)
 	assert.Nil(suite.T(), decreaseTx.Decrease(ctx, k.Stock{item1Decrease, item2Decrease}), "Decrease returned error")
 	assert.Nil(suite.T(), decreaseTx.Commit(), "Commit returned error")
 
 	// THEN
-	getTx,_ := suite.stockDao.BeginTx()
+	getTx, _ := suite.stockDao.BeginTx()
 	stock, err := getTx.Get(ctx)
 	assert.Nil(suite.T(), getTx.Commit())
 	sort.Sort(stock)
@@ -123,7 +123,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreased_THEN_tota
 func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvailability_THEN_errorIsReturned() {
 	// GIVEN
 	ctx := context.Background()
-	givenTx,_ := suite.stockDao.BeginTx()
+	givenTx, _ := suite.stockDao.BeginTx()
 
 	item1, _ := k.NewStockItem("Cheese", 5)
 	item2, _ := k.NewStockItem("Donuts", 7)
@@ -131,7 +131,7 @@ func (suite *StockDaoTestSuite) Test_GIVEN_stock_WHEN_stockIsDecreasedBeyondAvai
 	assert.Nil(suite.T(), givenTx.Commit(), "Commit returned error")
 
 	// WHEN
-	decreaseTx,_ := suite.stockDao.BeginTx()
+	decreaseTx, _ := suite.stockDao.BeginTx()
 	item1Decrease, _ := k.NewStockItem("Cheese", 7)
 	item2Decrease, _ := k.NewStockItem("Donuts", 10)
 	item3Decrease, _ := k.NewStockItem("Fig", 1)
