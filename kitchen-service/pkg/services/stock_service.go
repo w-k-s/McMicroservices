@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log"
 	"sort"
 
@@ -38,31 +36,19 @@ type stockService struct {
 	stockDao db.StockDao
 }
 
-func NewStockService(stockDao db.StockDao) (StockService, error) {
+func MustStockService(stockDao db.StockDao) StockService {
 	if stockDao == nil {
-		return nil, fmt.Errorf("can not create account service. stockDao is nil")
+		log.Fatal("can not create account service. stockDao is nil")
 	}
-
 	return &stockService{
 		stockDao: stockDao,
-	}, nil
-}
-
-func MustStockService(stockDao db.StockDao) StockService {
-	var (
-		svc StockService
-		err error
-	)
-	if svc, err = NewStockService(stockDao); err != nil {
-		log.Fatalf(err.Error())
 	}
-	return svc
 }
 
 func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 	var (
 		stock k.Stock
-		tx    *sql.Tx
+		tx    db.StockTx
 		err   error
 	)
 
@@ -73,7 +59,7 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 
 	defer db.DeferRollback(tx, "GetStock")
 
-	stock, err = svc.stockDao.Get(ctx, tx)
+	stock, err = tx.Get(ctx)
 	if err != nil {
 		return StockResponse{}, err
 	}
@@ -93,7 +79,7 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 
 func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) error {
 	var (
-		tx  *sql.Tx
+		tx  db.StockTx
 		err error
 	)
 
@@ -113,7 +99,7 @@ func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) 
 		received = append(received, stockItem)
 	}
 
-	err = svc.stockDao.Increase(ctx, tx, received)
+	err = tx.Increase(ctx, received)
 	if err != nil {
 		return err
 	}

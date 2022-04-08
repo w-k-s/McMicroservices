@@ -42,7 +42,7 @@ func init() {
 		log.Fatalf("Failed to configure application for tests. Reason: %s", err)
 	}
 
-	testDB = db.MustOpenPool(testConfig.Database())
+	testDB = db.Must(db.OpenPool(testConfig.Database()))
 	db.MustRunMigrations(testDB, testConfig.Database())
 }
 

@@ -21,7 +21,22 @@ func MustOpenStockDao(pool *sql.DB) dao.StockDao {
 	return &defaultStockDao{&RootDao{pool}}
 }
 
-func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock) error {
+func (s *defaultStockDao) BeginTx() (dao.StockTx, error) {
+	return StockTx(s.pool.Begin())
+}
+
+func StockTx(tx *sql.Tx, err error) (dao.StockTx,error){
+	if err != nil{
+		return nil,k.NewSystemError("failed to begin transaction",err)
+	}
+	return defaultStockTx{tx}, nil
+}
+
+type defaultStockTx struct {
+	*sql.Tx
+}
+
+func (tx defaultStockTx) Increase(ctx context.Context, stock k.Stock) error {
 	var err error
 
 	for _, item := range stock {
@@ -54,7 +69,7 @@ func (s defaultStockDao) Increase(ctx context.Context, tx *sql.Tx, stock k.Stock
 	return nil
 }
 
-func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock) error {
+func (tx defaultStockTx) Decrease(ctx context.Context, stock k.Stock) error {
 	var (
 		res          sql.Result
 		rowsAffected int64
@@ -89,7 +104,7 @@ func (s defaultStockDao) Decrease(ctx context.Context, tx *sql.Tx, stock k.Stock
 	return nil
 }
 
-func (s defaultStockDao) Get(ctx context.Context, tx *sql.Tx) (k.Stock, error) {
+func (tx defaultStockTx) Get(ctx context.Context) (k.Stock, error) {
 	var (
 		rows *sql.Rows
 		err  error

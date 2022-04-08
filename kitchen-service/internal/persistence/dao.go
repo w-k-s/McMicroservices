@@ -8,7 +8,6 @@ import (
 	"github.com/cenkalti/backoff"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	"github.com/w-k-s/McMicroservices/kitchen-service/log"
-	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 )
 
 type RootDao struct {
@@ -35,39 +34,11 @@ func OpenPool(dbConfig cfg.DBConfig) (*sql.DB, error) {
 	return db, nil
 }
 
-func MustOpenPool(dbConfig cfg.DBConfig) *sql.DB {
-	var (
-		db  *sql.DB
-		err error
-	)
-	if db, err = OpenPool(dbConfig); err != nil {
+func Must(db *sql.DB, err error) *sql.DB {
+	if err != nil {
 		log.Fatalf("Failed to open database connection pool. Reason: %s", err)
 	}
 	return db
-}
-
-func (r *RootDao) BeginTx() (*sql.Tx, error) {
-	var (
-		tx  *sql.Tx
-		err error
-	)
-
-	if tx, err = r.pool.Begin(); err != nil {
-		return nil, k.NewSystemError("failed to begin transaction", err)
-	}
-	return tx, nil
-}
-
-func (r *RootDao) MustBeginTx() *sql.Tx {
-	var (
-		tx  *sql.Tx
-		err error
-	)
-
-	if tx, err = r.pool.Begin(); err != nil {
-		log.Fatalf("Failed to begin transaction. Reason: %s", err)
-	}
-	return tx
 }
 
 func PingWithBackOff(db *sql.DB) error {

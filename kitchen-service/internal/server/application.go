@@ -83,7 +83,7 @@ func newApp(b *appBuilder) (*App, error) {
 		return nil, err
 	}
 
-	pool := db.MustOpenPool(b.config.Database())
+	pool := db.Must(db.OpenPool(b.config.Database()))
 	db.MustRunMigrations(pool, b.config.Database())
 
 	mux := mux.NewRouter()

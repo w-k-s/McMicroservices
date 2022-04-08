@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
 	"log"
 	"time"
 
@@ -39,25 +37,14 @@ type orderService struct {
 	stockDao db.StockDao
 }
 
-func NewOrderService(stockDao db.StockDao) (OrderService, error) {
+func MustOrderService(stockDao db.StockDao) OrderService {
 	if stockDao == nil {
-		return nil, fmt.Errorf("can not create account service. stockDao is nil")
+		log.Fatal("can not create account service. stockDao is nil")
 	}
 
 	return &orderService{
 		stockDao: stockDao,
-	}, nil
-}
-
-func MustOrderService(stockDao db.StockDao) OrderService {
-	var (
-		svc OrderService
-		err error
-	)
-	if svc, err = NewOrderService(stockDao); err != nil {
-		log.Fatalf(err.Error())
 	}
-	return svc
 }
 
 // I'm not happy with the return type.
@@ -65,7 +52,7 @@ func MustOrderService(stockDao db.StockDao) OrderService {
 // Can we return different event types and switch between topic based on the type of the event?
 func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error) {
 	var (
-		tx  *sql.Tx
+		tx  db.StockTx
 		err error
 	)
 
@@ -91,7 +78,7 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 		stock = append(stock, item)
 	}
 
-	err = svc.stockDao.Decrease(ctx, tx, stock)
+	err = tx.Decrease(ctx, stock)
 	if err != nil {
 		log.Printf("Error processing order %d. Reason: %q", req.OrderId, err.Error())
 		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
