@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/lalamove/nui/nlogger"
 	"github.com/w-k-s/konfig"
+	"github.com/lalamove/nui/nlogger"
 )
 
 var (
