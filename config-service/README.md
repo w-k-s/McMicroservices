@@ -8,10 +8,20 @@ This service is a centralized configuration store i.e. it provides configuration
 - The properties can be fetching using curl `http://localhost:8888/${application}/${profile}` e.g. `http://localhost:8888/order-service/default`
 - If a spring boot application is configured to pick up configurations from a config server, the application will pick up its own cconfigurations using the name configured in the `spring.application.name` property. For example, a spring application with the configuration `spring.application.name=order-service` will automatically pick up the configs returned from `http://localhost:8888/order-service/default`
 
-**Sample Configuration File**
+## Sample Configuration Files
+
+**Local**
 
 ```properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/db
 spring.datasource.username=admin
 spring.datasource.pssword=password
+```
+
+**Zalando K8s Postgres Operator**
+
+```
+spring.datasource.url=jdbc:postgresql://{postgresql-service}.{namespace}.svc.cluster.local:5432/{db}
+spring.datasource.username={user}
+spring.datasource.password={password}
 ```

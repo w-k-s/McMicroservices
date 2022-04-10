@@ -1,0 +1,27 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: mcm
+  region: ap-south-1
+
+managedNodeGroups:
+  - name: workers-v2
+    instanceType: t3.medium
+    minSize: 1
+    maxSize: 2
+    desiredCapacity: 2
+    iam:
+      # https://eksctl.io/usage/iam-policies/#attaching-inline-policies
+      # Config Service needs an IAM role to access AWS S3.
+      attachPolicy:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Action:
+          - 's3:GetObject'
+          Resource: 'arn:aws:s3:::com.wks.mcmicroservices.configservice/*'
+        - Effect: Allow
+          Action:
+          - 's3:GetObject'
+          Resource: 'arn:aws:s3:::com.wks.mcmicroservices.kitchenservice/*'
