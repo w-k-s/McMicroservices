@@ -8,25 +8,16 @@ import (
 )
 
 var (
-	configFilePath string
-	awsAccessKey   string
-	awsSecretKey   string
-	awsRegion      string
-	config         *cfg.Config
-	handler        *app.App
+	configFileUrl string
+	config        *cfg.Config
+	handler       *app.App
 )
 
 func init() {
 	const (
-		configFileUsage   = `Path to configFile. Must start with 'file://' (if file is in local filesystem) or 's3://' (if file is hosted on s3)`
-		awsAccessKeyUsage = "AWS Access key; used to download config file. Only required if config file is hosted on s3"
-		awsSecretKeyUsage = "AWS Secret key; used to download config file. Only required if config file is hosted on s3"
-		awsRegionUsage    = "AWS Region; used to download config file. Only required if config file is hosted on s3"
+		configFileUrlUsage = "URI to download the config file"
 	)
-	flag.StringVar(&configFilePath, "file", "", configFileUsage)
-	flag.StringVar(&awsAccessKey, "aws_access_key", "", awsAccessKeyUsage)
-	flag.StringVar(&awsSecretKey, "aws_secret_key", "", awsSecretKeyUsage)
-	flag.StringVar(&awsRegion, "aws_region", "", awsRegionUsage)
+	flag.StringVar(&configFileUrl, "uri", "", configFileUrlUsage)
 }
 
 func main() {
@@ -35,7 +26,7 @@ func main() {
 	// This results in a panic.
 	flag.Parse()
 
-	config = cfg.Must(cfg.LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion))
+	config = cfg.Must(cfg.LoadConfig(configFileUrl))
 	handler := app.Must(app.NewAppBuilder(config).Build())
 	defer handler.Close()
 

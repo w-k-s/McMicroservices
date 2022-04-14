@@ -4,8 +4,6 @@ github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
 # github.com/BurntSushi/toml v0.4.1
 ## explicit; go 1.16
-github.com/BurntSushi/toml
-github.com/BurntSushi/toml/internal
 # github.com/Microsoft/go-winio v0.4.17-0.20210211115548-6eac466e5fa3
 ## explicit; go 1.12
 github.com/Microsoft/go-winio
@@ -38,59 +36,6 @@ github.com/Microsoft/hcsshim/osversion
 ## explicit; go 1.16
 github.com/Shopify/sarama
 github.com/Shopify/sarama/mocks
-# github.com/aws/aws-sdk-go v1.43.31
-## explicit; go 1.11
-github.com/aws/aws-sdk-go/aws
-github.com/aws/aws-sdk-go/aws/arn
-github.com/aws/aws-sdk-go/aws/awserr
-github.com/aws/aws-sdk-go/aws/awsutil
-github.com/aws/aws-sdk-go/aws/client
-github.com/aws/aws-sdk-go/aws/client/metadata
-github.com/aws/aws-sdk-go/aws/corehandlers
-github.com/aws/aws-sdk-go/aws/credentials
-github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds
-github.com/aws/aws-sdk-go/aws/credentials/endpointcreds
-github.com/aws/aws-sdk-go/aws/credentials/processcreds
-github.com/aws/aws-sdk-go/aws/credentials/ssocreds
-github.com/aws/aws-sdk-go/aws/credentials/stscreds
-github.com/aws/aws-sdk-go/aws/csm
-github.com/aws/aws-sdk-go/aws/defaults
-github.com/aws/aws-sdk-go/aws/ec2metadata
-github.com/aws/aws-sdk-go/aws/endpoints
-github.com/aws/aws-sdk-go/aws/request
-github.com/aws/aws-sdk-go/aws/session
-github.com/aws/aws-sdk-go/aws/signer/v4
-github.com/aws/aws-sdk-go/internal/context
-github.com/aws/aws-sdk-go/internal/ini
-github.com/aws/aws-sdk-go/internal/s3shared
-github.com/aws/aws-sdk-go/internal/s3shared/arn
-github.com/aws/aws-sdk-go/internal/s3shared/s3err
-github.com/aws/aws-sdk-go/internal/sdkio
-github.com/aws/aws-sdk-go/internal/sdkmath
-github.com/aws/aws-sdk-go/internal/sdkrand
-github.com/aws/aws-sdk-go/internal/sdkuri
-github.com/aws/aws-sdk-go/internal/shareddefaults
-github.com/aws/aws-sdk-go/internal/strings
-github.com/aws/aws-sdk-go/internal/sync/singleflight
-github.com/aws/aws-sdk-go/private/checksum
-github.com/aws/aws-sdk-go/private/protocol
-github.com/aws/aws-sdk-go/private/protocol/eventstream
-github.com/aws/aws-sdk-go/private/protocol/eventstream/eventstreamapi
-github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
-github.com/aws/aws-sdk-go/private/protocol/jsonrpc
-github.com/aws/aws-sdk-go/private/protocol/query
-github.com/aws/aws-sdk-go/private/protocol/query/queryutil
-github.com/aws/aws-sdk-go/private/protocol/rest
-github.com/aws/aws-sdk-go/private/protocol/restjson
-github.com/aws/aws-sdk-go/private/protocol/restxml
-github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
-github.com/aws/aws-sdk-go/service/s3
-github.com/aws/aws-sdk-go/service/s3/s3iface
-github.com/aws/aws-sdk-go/service/s3/s3manager
-github.com/aws/aws-sdk-go/service/sso
-github.com/aws/aws-sdk-go/service/sso/ssoiface
-github.com/aws/aws-sdk-go/service/sts
-github.com/aws/aws-sdk-go/service/sts/stsiface
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -263,9 +208,6 @@ github.com/jcmturner/rpc/v2/ndr
 # github.com/jinzhu/copier v0.3.5
 ## explicit; go 1.13
 github.com/jinzhu/copier
-# github.com/jmespath/go-jmespath v0.4.0
-## explicit; go 1.14
-github.com/jmespath/go-jmespath
 # github.com/klauspost/compress v1.14.2
 ## explicit; go 1.15
 github.com/klauspost/compress
@@ -279,6 +221,7 @@ github.com/klauspost/compress/zstd/internal/xxhash
 github.com/lalamove/nui/nfs
 github.com/lalamove/nui/ngetter
 github.com/lalamove/nui/nlogger
+github.com/lalamove/nui/nstrings
 # github.com/lib/pq v1.10.2
 ## explicit; go 1.13
 github.com/lib/pq
@@ -372,11 +315,13 @@ github.com/testcontainers/testcontainers-go/wait
 # github.com/w-k-s/konfig v0.8.4-0.20220404193254-4d754f7201e0
 ## explicit; go 1.14
 github.com/w-k-s/konfig
+github.com/w-k-s/konfig/loader/klenv
 github.com/w-k-s/konfig/loader/klfile
-github.com/w-k-s/konfig/loader/kls3
+github.com/w-k-s/konfig/loader/klhttp
 github.com/w-k-s/konfig/parser
+github.com/w-k-s/konfig/parser/kpjson
 github.com/w-k-s/konfig/parser/kpmap
-github.com/w-k-s/konfig/parser/kptoml
+github.com/w-k-s/konfig/parser/kpyaml
 github.com/w-k-s/konfig/watcher/kwfile
 github.com/w-k-s/konfig/watcher/kwpoll
 # go.opencensus.io v0.22.4

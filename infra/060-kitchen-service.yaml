@@ -17,11 +17,11 @@ spec:
       labels:
         app: kitchen-service
     spec:
-      # TODO: add arguments (to download config from S3)
       containers:
         - name: kitchen-service
           image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/kitchen-service:f0f42d3acaefffb022adcc16815a129782f399ba
           imagePullPolicy: Always
+          args: ["-uri=http://config-service/kitchen-service-default.yaml"]
           ports:
             - containerPort: 8080
           livenessProbe:

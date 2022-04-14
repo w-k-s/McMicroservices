@@ -3,7 +3,6 @@ module github.com/w-k-s/McMicroservices/kitchen-service
 go 1.17
 
 require (
-	github.com/aws/aws-sdk-go v1.43.31
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/gobuffalo/validate v2.0.4+incompatible
 	github.com/golang-migrate/migrate/v4 v4.14.1
@@ -36,7 +35,7 @@ require (
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/lalamove/nui v0.3.0
 	github.com/moby/sys/mount v0.2.0 // indirect
 	github.com/moby/sys/mountinfo v0.4.1 // indirect
 	github.com/moby/term v0.0.0-20201216013528-df9cb8a40635 // indirect
@@ -75,7 +74,6 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jinzhu/copier v0.3.5 // indirect
 	github.com/klauspost/compress v1.14.2 // indirect
-	github.com/lalamove/nui v0.3.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect

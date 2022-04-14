@@ -38,7 +38,7 @@ func NewOrderHandler(
 	logger log.Logger,
 ) OrderHandler {
 	ctx, cancelFunc := context.WithCancel(logger.WithContext(context.Background()))
-	
+
 	orderHandler := &orderHandler{
 		orderService: orderService,
 		consumer:     consumer,

@@ -2,49 +2,25 @@ package config
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gobuffalo/validate"
-	"github.com/gobuffalo/validate/validators"
+	"github.com/lalamove/nui/nstrings"
 	"github.com/w-k-s/McMicroservices/kitchen-service/log"
 	"github.com/w-k-s/konfig"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/w-k-s/konfig/loader/klenv"
+	"github.com/w-k-s/konfig/loader/klfile"
+	"github.com/w-k-s/konfig/loader/klhttp"
+	"github.com/w-k-s/konfig/parser"
+	"github.com/w-k-s/konfig/parser/kpjson"
+	"github.com/w-k-s/konfig/parser/kpyaml"
 )
 
 type Config struct {
 	server ServerConfig
 	broker BrokerConfig
 	db     DBConfig
-}
-
-func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DBConfig) (*Config, error) {
-	config := &Config{
-		server: serverConfig,
-		broker: brokerConfig,
-		db:     dbConfig,
-	}
-
-	errors := validate.Validate(
-		&validators.IntIsGreaterThan{Name: "Server Port", Field: int(config.server.port), Compared: 1023, Message: "Server port must be at least 1023"},
-		&validators.StringLengthInRange{Name: "Database Username", Field: config.db.username, Min: 1, Max: 0, Message: "Database username is required"},
-		&validators.StringLengthInRange{Name: "Database Password", Field: config.db.password, Min: 1, Max: 0, Message: "Database password is required"},
-		&validators.StringLengthInRange{Name: "Database Host", Field: config.db.host, Min: 1, Max: 0, Message: "Database host is required"},
-		&validators.IntIsGreaterThan{Name: "Database Port", Field: int(config.db.port), Compared: 0, Message: "Database port is required"},
-		&validators.StringLengthInRange{Name: "Database Name", Field: config.db.host, Min: 1, Max: 0, Message: "Database name is required"},
-		&validators.StringInclusion{Name: "Database SSL Mode", Field: config.db.sslMode, List: []string{"disable", "require", "verify-ca", "verify-full"}, Message: "Database SSL Mode is required"},
-		&validators.StringLengthInRange{Name: "Migration Directory", Field: config.db.host, Min: 1, Max: 0, Message: "Migration Directory path is required"},
-		&boostrapServersValidator{Name: "Bootstrap servers", Field: config.broker.boostrapServers},
-	)
-
-	if errors.HasAny() {
-		return nil, errors
-	}
-
-	return config, nil
 }
 
 func (c Config) Server() ServerConfig {
@@ -59,95 +35,130 @@ func (c Config) Broker() BrokerConfig {
 	return c.broker
 }
 
-func readValues(store konfig.Store) (*Config, error) {
-	var (
-		consumerConfig consumerConfig
-		err            error
-	)
-
-	if consumerConfig, err = NewConsumerConfig(
-		store.String("broker.consumer.group_id"),
-		store.String("broker.consumer.auto_offset_reset"),
-	); err != nil {
-		return nil, fmt.Errorf("failed to create consumer config. Reason: %w", err)
+func NewConfig(serverConfig ServerConfig, brokerConfig BrokerConfig, dbConfig DBConfig) (*Config, error) {
+	config := &Config{
+		server: serverConfig,
+		broker: brokerConfig,
+		db:     dbConfig,
 	}
 
-	return NewConfig(
-		ServerConfig{
-			port:                store.Int("server.port"),
-			readTimeout:         store.Duration("server.read_timeout") * time.Second,
-			writeTimeout:        store.Duration("server.write_timeout") * time.Second,
-			maxHeaderBytes:      store.Int("server.max_header_bytes"),
-			shutdownGracePeriod: store.Duration("server.shutdown_grace_period") * time.Second,
-		},
-		BrokerConfig{
-			boostrapServers:  store.StringSlice("broker.bootstrap_servers"),
-			securityProtocol: store.String("broker.security_protocol"),
-			consumerConfig:   consumerConfig,
-			producerConfig:   NewProducerConfig(),
-		},
-		DBConfig{
-			username:     store.String("database.username"),
-			password:     store.String("database.password"),
-			host:         store.String("database.host"),
-			port:         store.Int("database.port"),
-			name:         store.String("database.name"),
-			sslMode:      store.String("database.sslmode"),
-			migrationDir: store.String("database.migration_dir"),
-		},
-	)
+	return config, nil
 }
 
-func DefaultApplicationRootDirectory() string {
-	return filepath.Join(mustUserHomeDir(), ".kitchen")
+func LoadConfig(configFilePath string) (*Config, error) {
+	return LoadConfigWithClient(configFilePath, http.DefaultClient)
 }
 
-func DefaultConfigFilePath() string {
-	return filepath.Join(DefaultApplicationRootDirectory(), "config.toml")
-}
-
-func DefaultMigrationsDirectoryPath() string {
-	return filepath.Join(DefaultApplicationRootDirectory(), "migrations")
-}
-
-func defaultTempDirectoryPath() string {
-	return filepath.Join(DefaultApplicationRootDirectory(), "temporary")
-}
-
-func defaultLogsDirectoryPath() string {
-	return filepath.Join(DefaultApplicationRootDirectory(), "logs")
-}
-
-func mustUserHomeDir() string {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal("Unable to access user's home directory")
-	}
-	return homeDir
-}
-
-func LoadConfig(configFilePath, awsAccessKey, awsSecretKey, awsRegion string) (*Config, error) {
+func LoadConfigWithClient(configFilePath string, httpClient klhttp.Client) (*Config, error) {
 	if len(configFilePath) == 0 {
 		configFilePath = "file://" + DefaultConfigFilePath()
 	}
 
+	store := konfig.New(konfig.DefaultConfig())
+	var loader konfig.LoaderWatcher
+
+	var fileParser parser.Func
+	if strings.HasSuffix(configFilePath, "json") {
+		fileParser = kpjson.Parser
+	} else if strings.HasSuffix(configFilePath, "yaml") {
+		fileParser = kpyaml.Parser
+	} else {
+		return nil, fmt.Errorf("config file path must have a json or yaml extension")
+	}
+
 	if strings.HasPrefix(configFilePath, "file://") {
 		absolutePath := strings.Replace(configFilePath, "file://", "", 1)
-		return localConfigSource{}.Load(absolutePath)
-	}
-
-	if strings.HasPrefix(configFilePath, "s3://") {
-		var (
-			s3Source *s3ConfigSource
-			err      error
+		loader = klfile.New(
+			&klfile.Config{
+				Files: []klfile.File{
+					{
+						Parser: fileParser,
+						Path:   absolutePath,
+					},
+				},
+			},
 		)
-		if s3Source, err = newS3ConfigSource(awsAccessKey, awsSecretKey, awsRegion); err != nil {
-			return nil, err
-		}
-		return s3Source.Load(configFilePath)
+	} else if strings.HasPrefix(configFilePath, "http://") {
+		loader = klhttp.New(
+			&klhttp.Config{
+				Client: httpClient,
+				Sources: []klhttp.Source{
+					{
+						URL:    configFilePath,
+						Method: "GET",
+						Parser: fileParser,
+					},
+				},
+			},
+		)
+	} else {
+		return nil, fmt.Errorf("config file must start with file:// or http://")
 	}
 
-	return nil, fmt.Errorf("Config file must start with file:// or s3://")
+	store.RegisterLoaderWatcher(loader)
+
+	// Override file config with env config
+	// KNOWN BUG: This doesn't work for configs keys that are camel cased
+	// e.g. The env var APP_BROKER_CONSUMER_AUTOOFFSETRESET does not override broker.consumer.autoOffsetReset
+	store.RegisterLoader(
+		klenv.New(&klenv.Config{
+			Regexp:         "^APP_.*",
+			SliceSeparator: ",",
+			Replacer: nstrings.ReplacerFunc(func(s string) string {
+				return strings.ToLower(strings.Replace(strings.TrimPrefix(s, "APP_"), "_", ".", -1))
+			}),
+		}),
+	)
+
+	if err := store.Load(); err != nil {
+		return nil, fmt.Errorf("failed to load config file from path '%s'. Reason: %w", configFilePath, err)
+	}
+
+	var (
+		serverConfig   ServerConfig
+		consumerConfig consumerConfig
+		brokerConfig   BrokerConfig
+		dbConfig       DBConfig
+		err            error
+	)
+	if serverConfig, err = NewServerConfigBuilder().
+		SetPort(store.Int("server.port")).
+		SetReadTimeout(store.Duration("server.readTimeout") * time.Second).
+		SetWriteTimeout(store.Duration("server.writeTimeout") * time.Second).
+		SetMaxHeaderBytes(store.Int("server.maxHeaderBytes")).
+		SetShutdownGracePeriod(store.Duration("server.shutdownGracePeriod") * time.Second).
+		Build(); err != nil {
+		return nil, fmt.Errorf("failed to load server config: %w", err)
+	}
+
+	if consumerConfig, err = NewConsumerConfig(
+		store.String("broker.consumer.groupId"),
+		store.String("broker.consumer.autoOffsetReset"),
+	); err != nil {
+		return nil, fmt.Errorf("failed to create consumer config: %w", err)
+	}
+
+	if brokerConfig, err = NewBrokerConfig(
+		store.StringSlice("broker.bootstrapServers"),
+		store.String("broker.securityProtocol"),
+		consumerConfig,
+	); err != nil {
+		return nil, fmt.Errorf("failed to load broker config: %w", err)
+	}
+
+	if dbConfig, err = NewDBConfigBuilder().
+		SetUsername(store.String("database.username")).
+		SetPassword(store.String("database.password")).
+		SetHost(store.String("database.host")).
+		SetPort(store.Int("database.port")).
+		SetName(store.String("database.name")).
+		SetSSLMode(store.String("database.sslmode")).
+		SetMigrationDirectory(store.String("database.migrationDir")).
+		Build(); err != nil {
+		return nil, fmt.Errorf("failed to load server config: %w", err)
+	}
+
+	return &Config{serverConfig, brokerConfig, dbConfig}, nil
 }
 
 func Must(config *Config, err error) *Config {
@@ -155,42 +166,4 @@ func Must(config *Config, err error) *Config {
 		log.Fatalf("failed to load config file. Reason: %s", err)
 	}
 	return config
-}
-
-func ConfigureLogging() (log.Logger, error) {
-	var err error
-	path := filepath.Join(defaultLogsDirectoryPath(), "server.log")
-	if err = os.MkdirAll(filepath.Dir(path), 0777); err != nil {
-		return nil, fmt.Errorf("failed to create temporary directory %q. Reason: %w", path, err)
-	}
-
-	if _, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666); err != nil {
-		return nil, fmt.Errorf("failed to open log file. Reason: %w", err)
-	}
-	lumberjackLogger := &lumberjack.Logger{
-		Filename:   path,
-		MaxSize:    5, // MB
-		MaxBackups: 10,
-		MaxAge:     30,   // days
-		Compress:   true, // disabled by default
-	}
-	multiWriter := io.MultiWriter(os.Stderr, lumberjackLogger)
-
-	return log.NewLogger(multiWriter), nil
-}
-
-type boostrapServersValidator struct {
-	Name  string
-	Field []string
-}
-
-func (v *boostrapServersValidator) IsValid(errors *validate.Errors) {
-	if len(v.Field) == 0 {
-		errors.Add(v.Name, "servers list can not be empty")
-	}
-	for _, server := range v.Field {
-		if len(server) == 0 {
-			errors.Add(v.Name, "server list can not contain empty strings")
-		}
-	}
 }

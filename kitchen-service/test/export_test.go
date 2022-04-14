@@ -32,10 +32,18 @@ var (
 )
 
 func init() {
+	var (
+		serverConfig cfg.ServerConfig
+		err          error
+	)
+	if serverConfig, err = cfg.NewServerConfigBuilder().
+		SetPort(9898).
+		Build(); err != nil {
+		log.Fatalf("failed to create server. Reason: %q", err)
+	}
+
 	if testConfig, _ = cfg.NewConfig(
-		cfg.NewServerConfigBuilder().
-			SetPort(9898).
-			Build(),
+		serverConfig,
 		requestKafkaTestContainer(),
 		requestDatabaseTestContainer(),
 	); err != nil {
@@ -72,22 +80,33 @@ func requestDatabaseTestContainer() cfg.DBConfig {
 
 	testContainerDataSourceName = fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", postgresHost, postgresPort.Int(), testContainerPostgresUser, testContainerPostgresPassword, testContainerPostgresDB)
 
-	return cfg.NewDBConfigBuilder().
+	var db cfg.DBConfig
+	if db, err = cfg.NewDBConfigBuilder().
 		SetUsername(testContainerPostgresUser).
 		SetPassword(testContainerPostgresPassword).
 		SetHost(postgresHost).
 		SetPort(postgresPort.Int()).
 		SetName(testContainerDataSourceName).
-		Build()
+		Build(); err != nil {
+		log.Fatalf("Failed to create db test constainer. Reason: %q", err)
+	}
+	return db
 }
 
 func requestKafkaTestContainer() cfg.BrokerConfig {
 	consumerConfig, _ := cfg.NewConsumerConfig("group_id", "earliest")
-	return cfg.NewBrokerConfig(
+	var (
+		brokerConfig cfg.BrokerConfig
+		err          error
+	)
+	if brokerConfig, err = cfg.NewBrokerConfig(
 		[]string{"localhost:9012"},
 		"plaintext",
 		consumerConfig,
-	)
+	); err != nil {
+		log.Fatalf("failed to create test broker. Reason: %q", err)
+	}
+	return brokerConfig
 }
 
 func TestMain(m *testing.M) {

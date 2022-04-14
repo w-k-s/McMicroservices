@@ -17,4 +17,4 @@ RUN mkdir -p /root/.kitchen/migrations
 COPY --from=builder /go/src/github.com/w-k-s/McMicroservices/kitchen-service/app .
 COPY --from=builder /go/src/github.com/w-k-s/McMicroservices/kitchen-service/migrations .kitchen/migrations
 
-ENTRYPOINT ["./app", "-file=s3://com.wks.mcmicroservices.kitchenservice/config.toml"]
+ENTRYPOINT ["./app"]

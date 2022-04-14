@@ -52,17 +52,13 @@ func MustOrderService(stockDao db.StockDao) OrderService {
 // The OrderResponse should be sent to a different topic depending upon whether error is nil or not. Can we improve this?
 // Can we return different event types and switch between topic based on the type of the event?
 func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (OrderResponse, error) {
-	var (
-		tx  db.StockTx
-		err error
-	)
 
 	log.InfoCtx(ctx).
 		UInt64("orderId", req.OrderId).
 		Struct("toppings", req.Toppings).
 		Msg("Processing order")
 
-	tx, err = svc.stockDao.BeginTx()
+	tx, err := svc.stockDao.BeginTx()
 	if err != nil {
 		return OrderResponse{req.OrderId, k.OrderStatusFailed, err.Error()}, err
 	}
@@ -82,8 +78,7 @@ func (svc orderService) ProcessOrder(ctx context.Context, req OrderRequest) (Ord
 		stock = append(stock, item)
 	}
 
-	err = tx.Decrease(ctx, stock)
-	if err != nil {
+	if err = tx.Decrease(ctx, stock); err != nil {
 		log.ErrCtx(ctx, err).
 			UInt64("orderId", req.OrderId).
 			Msg("Error processing order")

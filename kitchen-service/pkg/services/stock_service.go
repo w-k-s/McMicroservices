@@ -47,20 +47,15 @@ func MustStockService(stockDao db.StockDao) StockService {
 }
 
 func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
-	var (
-		stock k.Stock
-		tx    db.StockTx
-		err   error
-	)
 
-	tx, err = svc.stockDao.BeginTx()
+	tx, err := svc.stockDao.BeginTx()
 	if err != nil {
 		return StockResponse{}, err
 	}
 
 	defer db.DeferRollback(tx, "GetStock")
 
-	stock, err = tx.Get(ctx)
+	stock, err := tx.Get(ctx)
 	if err != nil {
 		return StockResponse{}, err
 	}
@@ -79,12 +74,8 @@ func (svc stockService) GetStock(ctx context.Context) (StockResponse, error) {
 }
 
 func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) error {
-	var (
-		tx  db.StockTx
-		err error
-	)
 
-	tx, err = svc.stockDao.BeginTx()
+	tx, err := svc.stockDao.BeginTx()
 	if err != nil {
 		return err
 	}
@@ -100,8 +91,7 @@ func (svc stockService) ReceiveInventory(ctx context.Context, req StockRequest) 
 		received = append(received, stockItem)
 	}
 
-	err = tx.Increase(ctx, received)
-	if err != nil {
+	if err = tx.Increase(ctx, received); err != nil {
 		return err
 	}
 

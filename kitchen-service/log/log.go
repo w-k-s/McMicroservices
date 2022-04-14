@@ -153,5 +153,5 @@ func (e *internalLogEvent) Msg(msg string) {
 }
 
 func (e *internalLogEvent) Msgf(format string, args ...interface{}) {
-	e.e.Msgf(format, args)
+	e.e.Msgf(format, args...)
 }
