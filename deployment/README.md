@@ -43,10 +43,10 @@ kubectl apply -f 000-namespaces.yaml
 
 [Reference](https://postgres-operator.readthedocs.io/en/latest/quickstart/)
 
-1. Run db.yaml
+1. Set up the postgres operator
 
 	```
-	kubectl apply -f 020-db.yaml
+	kubectl apply -f db/
 	```
 
 	This should print:
@@ -60,13 +60,24 @@ kubectl apply -f 000-namespaces.yaml
 	clusterrole.rbac.authorization.k8s.io/postgres-pod created
 	deployment.apps/postgres-operator created
 	service/postgres-operator created
-	postgresql.acid.zalan.do/acid-minimal-cluster created
+	```
+
+	To see the pods, you can run:
+
+	```
+	kubectl -n db get pod -l name=postgres-operator
+	```
+
+2. Create a postgres cluster in the app namespace
+
+	```
+	kubectl apply -f 020-db.yaml
 	```
 
 2. Check that the status of the postgres cluster by running the following command:
 
 	```
-	 kubectl -n db get postgresql -w
+	 kubectl -n app get postgresql -w
 	```
 
 	This should print:
@@ -76,35 +87,27 @@ kubectl apply -f 000-namespaces.yaml
 	acid-minimal-cluster   acid   14        1      1Gi                                     45s   Creating
 	```
 
-	To see the pods, you can run:
-
-	```
-	kubectl -n db get pod -l name=postgres-operator
-	```
-
 3. To get the password for user `postgres`:
 
 	```
-	kubectl -n db get secret postgres.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d
+	kubectl -n app get secret postgres.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d
 	```
 
 	To get the password for user `root`:
 	```
-	kubectl -n db get secret root.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d
+	kubectl -n app get secret root.acid-minimal-cluster.credentials.postgresql.acid.zalan.do -o 'jsonpath={.data.password}' | base64 -d
 	```
-
-	
 
 4. If the cluster fails, you can get more info using:
 
 	```
-	kubectl -n db describe postgresql
+	kubectl -n app describe postgresql
 	```
 
 5. Delete the cluster:
 
 	```
-	kubectl -n db delete postgresql acid-minimal-cluster
+	kubectl -n app delete postgresql acid-minimal-cluster
 	```
 ### Setting up Kafka
 
@@ -142,7 +145,7 @@ kubectl -n app apply -f 040-config-service.yaml
 You can verify the config service is running by running the following commands in terminal:
 
 ```
-kubectl -b app port-forward svc/config-service 8888:80
+kubectl -n app port-forward svc/config-service 8888:80
 curl http://localhost:8888/actuator/health
 ```
 
@@ -154,4 +157,17 @@ This will print:
 You can verify that the server is providing configurations using:
 ```
 curl http://localhost:8888/order-service/default 
+```
+
+**Order Service**
+
+```
+kubectl -n app apply -f 060-order-service.yaml
+```
+
+You can verify the order service is running by running the following commands in terminal:
+
+```
+kubectl -n app port-forward svc/order-service 8081:80
+curl http://localhost:8081/actuator/health
 ```

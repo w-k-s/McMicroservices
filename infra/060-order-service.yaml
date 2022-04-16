@@ -27,6 +27,19 @@ spec:
                 configMapKeyRef:
                   name: common-config
                   key: CONFIG_SERVER_URL
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: root.acid-minimal-cluster.credentials.postgresql.acid.zalan.do
+                  key: password
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://acid-minimal-cluster.app.svc.cluster.local:5432/mcmicroservices
+            - name: SPRING_KAFKA_CONSUMER_BOOTSTRAP_SERVERS
+              value: kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9091,kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9092,kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9093
+            - name: SPRING_KAFKA_PRODUCER_BOOTSTRAP_SERVERS
+              value: kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9091,kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9092,kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9093
           ports:
             - containerPort: 8080
           livenessProbe:

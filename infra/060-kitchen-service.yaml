@@ -19,9 +19,23 @@ spec:
     spec:
       containers:
         - name: kitchen-service
-          image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/kitchen-service:f0f42d3acaefffb022adcc16815a129782f399ba
+          image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/kitchen-service:71a480730609e0a9bcd00845a191a07b855c20e3
           imagePullPolicy: Always
           args: ["-uri=http://config-service/kitchen-service-default.yaml"]
+          env:
+            - name: APP_DATABASE_USERNAME
+              value: root
+            - name: APP_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: root.acid-minimal-cluster.credentials.postgresql.acid.zalan.do
+                  key: password
+            - name: APP_DATABASE_SSLMODE
+              value: require # Otherwise connection will be rejected. https://postgres-operator.readthedocs.io/en/latest/quickstart/#connect-to-the-postgres-cluster-via-psql
+            - name: APP_DATABASE_HOST
+              value: acid-minimal-cluster.app.svc.cluster.local
+            - name: APP_broker.bootstrapServers # KNOWN ISSUE: This doesn't work. The config needs to be updated in the config file.
+              value: kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9091,kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9092,kafka-cluster-kafka-bootstrap.app.svc.cluster.local:9093
           ports:
             - containerPort: 8080
           livenessProbe:

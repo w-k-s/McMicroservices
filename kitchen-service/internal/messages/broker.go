@@ -21,6 +21,7 @@ func NewProducer(brokerConfig cfg.BrokerConfig) (sarama.SyncProducer, error) {
 	producerConfig := sarama.NewConfig()
 	producerConfig.Producer.Partitioner = sarama.NewRandomPartitioner
 	producerConfig.Producer.RequiredAcks = sarama.WaitForAll
+	producerConfig.Producer.Return.Successes = true // required for sync producer
 	return sarama.NewSyncProducer(brokerConfig.BootstrapServers(), producerConfig)
 }
 
