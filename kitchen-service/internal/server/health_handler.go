@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -26,22 +27,17 @@ func MustHealthHandler(db *sql.DB) healthHandler {
 func (h healthHandler) CheckHealth(w http.ResponseWriter, req *http.Request) {
 
 	report := make(StatusReport)
-	report["database"] = h.databaseStatusReport()
+	report["database"] = h.databaseStatusReport(req.Context())
 
 	h.MustEncodeJson(w, report, report.overallStatus().HttpCode())
 }
 
-func (h healthHandler) databaseStatusReport() status {
-	var (
-		db  *sql.DB
-		err error
-	)
-
-	if err = dao.PingWithBackOff(db); err != nil {
-		log.Printf("Ping failed for health check. Reason: %s", err)
+func (h healthHandler) databaseStatusReport(ctx context.Context) status {
+	if err := dao.PingWithBackOff(h.db); err != nil {
+		log.ErrCtx(ctx, err).
+			Msg("Ping failed for health check")
 		return down
 	}
-
 	return up
 }
 
