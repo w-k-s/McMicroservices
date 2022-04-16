@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: kitchen-service
-          image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/kitchen-service:71a480730609e0a9bcd00845a191a07b855c20e3
+          image: 838107339577.dkr.ecr.ap-south-1.amazonaws.com/w-k-s/mcmicroservices/kitchen-service:fcca2e3c57bb9c3b200b331b04b5ccbfff175a60
           imagePullPolicy: Always
           args: ["-uri=http://config-service/kitchen-service-default.yaml"]
           env:

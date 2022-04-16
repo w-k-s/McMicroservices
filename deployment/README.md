@@ -171,3 +171,8 @@ You can verify the order service is running by running the following commands in
 kubectl -n app port-forward svc/order-service 8081:80
 curl http://localhost:8081/actuator/health
 ```
+
+You can try posting an order using:
+```
+curl -X POST -d '{"toppings":["Tomato"]}' -H 'Content-Type: application/json' http://localhost:8081/orders/api/v1/orders
+``
