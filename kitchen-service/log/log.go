@@ -31,7 +31,10 @@ type Event interface {
 }
 
 func NewLogger(w io.Writer) Logger {
-	l := zerolog.New(w)
+	l := zerolog.New(w).
+		With().
+		Timestamp().
+		Logger()
 	return &internalLogger{
 		l: &l,
 	}

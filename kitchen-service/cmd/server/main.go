@@ -3,14 +3,16 @@ package main
 import (
 	"flag"
 
+	a "github.com/w-k-s/McMicroservices/kitchen-service/internal/app"
+	"github.com/w-k-s/McMicroservices/kitchen-service/internal/broker"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
-	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
+	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
+	"github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 )
 
 var (
 	configFileUrl string
 	config        *cfg.Config
-	handler       *app.App
 )
 
 func init() {
@@ -27,8 +29,19 @@ func main() {
 	flag.Parse()
 
 	config = cfg.Must(cfg.LoadConfig(configFileUrl))
-	handler := app.Must(app.NewAppBuilder(config).Build())
-	defer handler.Close()
+	pool := db.Must(db.OpenPool(config.Database()))
+	consumer := broker.MustConsumer(broker.KafkaConsumer(config.Broker(), config.Broker().ConsumerConfig()))
+	producer := broker.MustProducer(broker.KafkaProducer(config.Broker()))
 
-	handler.ListenAndServe()
+	app := a.Must(a.New(a.Builder{
+		Config:   config,
+		Pool:     pool,
+		Consumer: consumer,
+		Producer: producer,
+	}))
+
+	srv := server.New(config.Server(), app)
+	srv.RegisterOnShutdown(app.Close)
+
+	srv.ListenAndServe()
 }

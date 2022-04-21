@@ -62,19 +62,17 @@ func NewBrokerConfig(
 	}, nil
 }
 
-type AutoOffsetReset string
-
 const (
-	Earliest AutoOffsetReset = "earliest"
-	Newest   AutoOffsetReset = "newest"
+	Earliest string = "earliest"
+	Newest   string = "newest"
 )
 
 type consumerConfig struct {
 	groupId         string
-	autoOffsetReset AutoOffsetReset
+	autoOffsetReset string
 }
 
-func MustAutoOffsetReset(autoOffsetReset string) AutoOffsetReset {
+func MustAutoOffsetReset(autoOffsetReset string) string {
 	switch strings.ToLower(autoOffsetReset) {
 	case string(Earliest):
 		return Earliest
@@ -105,7 +103,7 @@ func (cc consumerConfig) GroupId() string {
 	return cc.groupId
 }
 
-func (cc consumerConfig) AutoOffsetReset() AutoOffsetReset {
+func (cc consumerConfig) AutoOffsetReset() string {
 	return cc.autoOffsetReset
 }
 

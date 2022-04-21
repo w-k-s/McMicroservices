@@ -1,4 +1,4 @@
-package server
+package app
 
 import (
 	"context"
@@ -12,28 +12,17 @@ import (
 	dao "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
 )
 
-type healthHandler struct {
-	Handler
-	db *sql.DB
-}
+func (a *App) HealthCheck() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		report := make(StatusReport)
+		report["database"] = databaseStatusReport(r.Context(), a.pool)
 
-func MustHealthHandler(db *sql.DB) healthHandler {
-	if db == nil {
-		log.Fatalf("healthHandler received db: nil. non-nil db expected")
+		a.serde.MustSerialize(w, r, report.overallStatus().HttpCode(), report)
 	}
-	return healthHandler{Handler{}, db}
 }
 
-func (h healthHandler) CheckHealth(w http.ResponseWriter, req *http.Request) {
-
-	report := make(StatusReport)
-	report["database"] = h.databaseStatusReport(req.Context())
-
-	h.MustEncodeJson(w, report, report.overallStatus().HttpCode())
-}
-
-func (h healthHandler) databaseStatusReport(ctx context.Context) status {
-	if err := dao.PingWithBackOff(h.db); err != nil {
+func databaseStatusReport(ctx context.Context, db *sql.DB) status {
+	if err := dao.PingWithBackOff(db); err != nil {
 		log.ErrCtx(ctx, err).
 			Msg("Ping failed for health check")
 		return down

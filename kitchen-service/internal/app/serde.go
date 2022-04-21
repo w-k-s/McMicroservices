@@ -1,40 +1,47 @@
-package server
+package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
 
 	"github.com/w-k-s/McMicroservices/kitchen-service/log"
-
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 	"schneider.vip/problem"
 )
 
-type Handler struct {
+// Represents a serializer-deserializer that:
+// - Deserializes the request based on the Content-Type header
+// - Serializes the response based on the Consumes/Accept header
+type Serde interface {
+	MustSerialize(w http.ResponseWriter, req *http.Request, status int, v interface{})
+	Deserialize(w http.ResponseWriter, req *http.Request, v interface{}) bool
+
+	MustSerailizeError(w http.ResponseWriter, req *http.Request, status int, err error)
 }
 
-func (h Handler) MustEncodeJson(w http.ResponseWriter, v interface{}, status int) {
-	encoder := json.NewEncoder(w)
-	encoder.SetEscapeHTML(true)
+// A dumb serde
+// - Assumes the request is encoded in JSON and deserializes accordingly. Does not consider the Content-Type header.
+// - Serializes the response as JSON. Does not consider the Accept header.
+type JsonSerde struct {
+	encoder JSONEncoder
+	decoder JSONDecoder
+}
+
+func (ser JsonSerde) MustSerialize(w http.ResponseWriter, req *http.Request, status int, v interface{}) {
 	w.WriteHeader(status)
-	if err := encoder.Encode(v); err != nil {
-		log.Fatalf("Failed to encode json '%v'. Reason: %s", v, err)
-	}
+	ser.encoder.MustEncode(w, v)
 }
 
-func (h Handler) DecodeJsonOrSendBadRequest(w http.ResponseWriter, req *http.Request, v interface{}) bool {
-	decoder := json.NewDecoder(req.Body)
-	decoder.UseNumber()
-	if err := decoder.Decode(v); err != nil {
-		h.MustEncodeProblem(w, req, k.InvalidError{Cause: fmt.Errorf("failed to parse request. Reason: %w", err)})
+func (ser JsonSerde) MustDeserialize(w http.ResponseWriter, req *http.Request, v interface{}) bool {
+	if err := ser.decoder.Decode(req.Body, v); err != nil {
+		ser.MustSerailizeError(w, req, http.StatusBadRequest, k.InvalidError{Cause: fmt.Errorf("failed to parse request. Reason: %w", err)})
 		return false
 	}
 	return true
 }
 
-func (h Handler) MustEncodeProblem(w http.ResponseWriter, req *http.Request, err error) {
+func (ser JsonSerde) MustSerailizeError(w http.ResponseWriter, req *http.Request, status int, err error) {
 
 	log.ErrCtx(req.Context(), err).Msg("Encoding Problem")
 
@@ -42,7 +49,7 @@ func (h Handler) MustEncodeProblem(w http.ResponseWriter, req *http.Request, err
 	code := url.QueryEscape(title)
 	detail := err.Error()
 	opts := []problem.Option{}
-	status := httpStatus(err)
+	status = httpStatus(err)
 
 	for key, value := range errorFields(err) {
 		opts = append(opts, problem.Custom(key, value))
@@ -99,9 +106,4 @@ func errorFields(err error) map[string]string {
 	return map[string]string{}
 }
 
-func (h Handler) MustMarshal(result []byte, err error) []byte {
-	if err != nil {
-		log.Fatalf("Marshal to json failed. Reason: %s", err)
-	}
-	return result
-}
+var DefaultJsonSerde = JsonSerde{JSONEncoder{}, JSONDecoder{}}

@@ -6,7 +6,7 @@ metadata:
   region: ap-south-1
 
 managedNodeGroups:
-  - name: workers-v2
+  - name: workers
     instanceType: t3.medium
     minSize: 1
     maxSize: 2
@@ -17,11 +17,11 @@ managedNodeGroups:
       attachPolicy:
         Version: "2012-10-17"
         Statement:
-        - Effect: Allow
-          Action:
-          - 's3:GetObject'
-          Resource: 'arn:aws:s3:::com.wks.mcmicroservices.configservice/*'
-        - Effect: Allow
-          Action:
-          - 's3:GetObject'
-          Resource: 'arn:aws:s3:::com.wks.mcmicroservices.kitchenservice/*'
+          - Effect: Allow
+            Action:
+              - "s3:GetObject"
+            Resource: "arn:aws:s3:::com.wks.mcmicroservices.configservice/*"
+          - Effect: Allow
+            Action:
+              - "s3:GetObject"
+            Resource: "arn:aws:s3:::com.wks.mcmicroservices.kitchenservice/*"

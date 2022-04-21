@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/w-k-s/konfig"
 	"github.com/lalamove/nui/nstrings"
+	"github.com/w-k-s/konfig"
 )
 
 var (
