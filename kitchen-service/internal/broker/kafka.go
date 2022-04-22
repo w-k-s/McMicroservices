@@ -237,15 +237,16 @@ func (m mockKafkaConsumer) YieldMessage(msg Message) {
 			Key:   []byte(msg.Key),
 			Value: msg.Content,
 		})
-	}
-	panic(fmt.Sprintf("There is no mock partitionConsumr created for Topic: %s", msg.Topic))
+	} else {
+		panic(fmt.Sprintf("There is no mock partitionConsumer created for Topic: %s", msg.Topic))
+	}	
 }
 
 type mockKafkaProducer struct {
 	mockProducer *mocks.AsyncProducer
 }
 
-func MockKafkaProducer(t *testing.T, topicPartitionMap map[string]int32, config KafkaConsumerConfig) (MockProducer, error) {
+func MockKafkaProducer(t *testing.T) (MockProducer, error) {
 	testProducer := mocks.NewAsyncProducer(t, nil)
 	return &mockKafkaProducer{
 		testProducer,

@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 
-	a "github.com/w-k-s/McMicroservices/kitchen-service/internal/app"
+	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/app"
 	"github.com/w-k-s/McMicroservices/kitchen-service/internal/broker"
 	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
@@ -33,15 +33,15 @@ func main() {
 	consumer := broker.MustConsumer(broker.KafkaConsumer(config.Broker(), config.Broker().ConsumerConfig()))
 	producer := broker.MustProducer(broker.KafkaProducer(config.Broker()))
 
-	app := a.Must(a.New(a.Builder{
+	a := app.Must(app.New(app.Builder{
 		Config:   config,
 		Pool:     pool,
 		Consumer: consumer,
 		Producer: producer,
 	}))
 
-	srv := server.New(config.Server(), app)
-	srv.RegisterOnShutdown(app.Close)
+	srv := server.New(config.Server(), a)
+	srv.RegisterOnShutdown(a.Close)
 
 	srv.ListenAndServe()
 }

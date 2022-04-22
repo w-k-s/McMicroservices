@@ -3,18 +3,15 @@ package test
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/Shopify/sarama"
-	"github.com/Shopify/sarama/mocks"
 	"github.com/stretchr/testify/assert"
-	cfg "github.com/w-k-s/McMicroservices/kitchen-service/internal/config"
+	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/app"
+	"github.com/w-k-s/McMicroservices/kitchen-service/internal/broker"
 	db "github.com/w-k-s/McMicroservices/kitchen-service/internal/persistence"
-	app "github.com/w-k-s/McMicroservices/kitchen-service/internal/server"
 	k "github.com/w-k-s/McMicroservices/kitchen-service/pkg/kitchen"
 )
 
@@ -22,15 +19,8 @@ import (
 
 func Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSuccessfully(t *testing.T) {
 
-	var (
-		stockDao     = db.MustOpenStockDao(testDB)
-		testConsumer = mocks.NewConsumer(t, nil)
-		testProducer = mocks.NewSyncProducer(t, nil)
-		testApp      *app.App
-		err          error
-	)
-
 	// GIVEN
+	stockDao     := db.MustOpenStockDao(testDB)
 	tx, _ := stockDao.BeginTx()
 	if err = tx.Increase(context.Background(), k.Stock{
 		k.Must(k.NewStockItem("Tomatoes", 2)),
@@ -43,8 +33,14 @@ func Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSucces
 		t.Errorf("Failed to commit stock update. Reason: %q", err)
 	}
 
-	testProducer.ExpectSendMessageWithCheckerFunctionAndSucceed(func(body []byte) error {
-		expected := "{\"id\":1,\"status\":\"READY\"}"
+	testConsumer, _ := broker.MockKafkaConsumer(t, map[string]int32{
+		app.TopicCreateOrder:       0,
+		app.TopicInventoryDelivery: 0,
+	},testConfig.Broker().ConsumerConfig())
+
+	testProducer,_ := broker.MockKafkaProducer(t)
+	testProducer.VerifyMessageSent(func(body []byte) error {
+		expected := "{\"id\":1,\"status\":\"READY\"}\n"
 		actual := string(body)
 		if expected != actual {
 			return fmt.Errorf("Expected %q. Got %q", expected, actual)
@@ -52,34 +48,18 @@ func Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSucces
 		return nil
 	})
 
-	mockProducerFactory := func(brokerConfig cfg.BrokerConfig) (sarama.SyncProducer, error) {
-		return testProducer, nil
-	}
-
-	testConsumer.SetTopicMetadata(map[string][]int32{
-		app.TopicCreateOrder:       {0},
-		app.TopicInventoryDelivery: {0},
-	})
-	partitionConsumer := testConsumer.ExpectConsumePartition(app.TopicCreateOrder, 0, sarama.OffsetOldest)
-	_ = testConsumer.ExpectConsumePartition(app.TopicInventoryDelivery, 0, sarama.OffsetOldest)
-	mockConsumerFactory := func(brokerConfig cfg.BrokerConfig) (sarama.Consumer, error) {
-		return testConsumer, nil
-	}
-
-	if testApp, err =
-		app.NewAppBuilder(testConfig).
-			SetConsumerFactory(mockConsumerFactory).
-			SetProducerFactory(mockProducerFactory).
-			Build(); err != nil {
-		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
-	}
+	testApp := app.Must(app.New(app.Builder{
+			Config: testConfig,
+			Pool: testDB,
+			Consumer: testConsumer,
+			Producer: testProducer,
+		}))
 
 	// WHEN
-	partitionConsumer.
-		YieldMessage(&sarama.ConsumerMessage{
+	testConsumer.
+		YieldMessage(broker.Message{
 			Topic:     app.TopicCreateOrder,
-			Partition: 0,
-			Value:     []byte(`{"id":1,"toppings":["Tomatoes","Onions","Mustard"]}`),
+			Content:     []byte(`{"id":1,"toppings":["Tomatoes","Onions","Mustard"]}`),
 		})
 
 	// THEN
@@ -89,7 +69,7 @@ func Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSucces
 	// -- Check that stock was reduced correctly
 	r, _ := http.NewRequest("GET", "/kitchen/api/v1/stock", nil)
 	w := httptest.NewRecorder()
-	testApp.Router().ServeHTTP(w, r)
+	testApp.ServeHTTP(w, r)
 
 	assert.Equal(t, 200, w.Code)
 	assert.JSONEq(t, `{
@@ -111,15 +91,14 @@ func Test_GIVEN_sufficientStock_WHEN_orderIsReceived_THEN_orderIsProcessedSucces
 }
 
 func Test_GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected(t *testing.T) {
-	var (
-		testConsumer = mocks.NewConsumer(t, nil)
-		testProducer = mocks.NewSyncProducer(t, nil)
-		testApp      *app.App
-		err          error
-	)
-
 	// GIVEN
-	testProducer.ExpectSendMessageWithCheckerFunctionAndSucceed(func(body []byte) error {
+	testConsumer, _ := broker.MockKafkaConsumer(t, map[string]int32{
+		app.TopicCreateOrder:       0,
+		app.TopicInventoryDelivery: 0,
+	},testConfig.Broker().ConsumerConfig())
+
+	testProducer,_ := broker.MockKafkaProducer(t)
+	testProducer.VerifyMessageSent(func(body []byte) error {
 		expected := "{\"id\":1,\"status\":\"FAILED\",\"reason\":\"insufficient stock of \\\"Tomatoes\\\"\"}"
 		actual := string(body)
 		if expected != actual {
@@ -128,34 +107,18 @@ func Test_GIVEN_insufficientStock_WHEN_orderIsReceived_THEN_orderIsRejected(t *t
 		return nil
 	})
 
-	mockProducerFactory := func(brokerConfig cfg.BrokerConfig) (sarama.SyncProducer, error) {
-		return testProducer, nil
-	}
-
-	testConsumer.SetTopicMetadata(map[string][]int32{
-		app.TopicCreateOrder:       {0},
-		app.TopicInventoryDelivery: {0},
-	})
-	partitionConsumer := testConsumer.ExpectConsumePartition(app.TopicCreateOrder, 0, sarama.OffsetOldest)
-	_ = testConsumer.ExpectConsumePartition(app.TopicInventoryDelivery, 0, sarama.OffsetOldest)
-	mockConsumerFactory := func(brokerConfig cfg.BrokerConfig) (sarama.Consumer, error) {
-		return testConsumer, nil
-	}
-
-	if testApp, err =
-		app.NewAppBuilder(testConfig).
-			SetConsumerFactory(mockConsumerFactory).
-			SetProducerFactory(mockProducerFactory).
-			Build(); err != nil {
-		log.Fatalf("Failed to initialize application for tests. Reason: %s", err)
-	}
+	testApp := app.Must(app.New(app.Builder{
+		Config: testConfig,
+		Pool: testDB,
+		Consumer: testConsumer,
+		Producer: testProducer,
+	}))
 
 	// WHEN
-	partitionConsumer.
-		YieldMessage(&sarama.ConsumerMessage{
+	testConsumer.
+		YieldMessage(broker.Message{
 			Topic:     app.TopicCreateOrder,
-			Partition: 0,
-			Value:     []byte(`{"id":1,"toppings":["Tomatoes","Onions","Mustard"]}`),
+			Content:     []byte(`{"id":1,"toppings":["Tomatoes","Onions","Mustard"]}`),
 		})
 
 	// THEN
